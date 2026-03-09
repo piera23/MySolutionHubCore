@@ -1,0 +1,138 @@
+﻿@page "/notifications"
+@rendermode InteractiveServer
+@using MudBlazor
+@using Web.Services
+@inherits AppPageBase
+@inject ISnackbar Snackbar
+
+<PageTitle>Notifiche — MySolutionHub</PageTitle>
+
+@if (!_initialized)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    return;
+}
+
+@if (!AuthState.IsAuthenticated)
+{
+    Nav.NavigateTo("/login");
+    return;
+}
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h6" Style="font-weight:700">🔔 Notifiche</MudText>
+    @if (_notifications.Any(n => !n.IsRead))
+    {
+        <MudButton Variant="Variant.Text" Color="Color.Primary"
+                   OnClick="MarkAllRead">
+            Segna tutte come lette
+        </MudButton>
+    }
+</div>
+
+@if (_loading)
+{
+    @for (int i = 0; i < 4; i++)
+    {
+        <MudPaper Elevation="1" Class="pa-3 mb-2 rounded-lg">
+            <MudSkeleton Width="80%" />
+            <MudSkeleton Width="60%" Class="mt-1" />
+        </MudPaper>
+    }
+}
+else if (!_notifications.Any())
+{
+    <MudPaper Elevation="1" Class="pa-6 rounded-lg text-center">
+        <MudIcon Icon="@Icons.Material.Filled.NotificationsNone"
+                 Size="Size.Large" Color="Color.Secondary" />
+        <MudText Color="Color.Secondary" Class="mt-2">
+            Nessuna notifica non letta
+        </MudText>
+    </MudPaper>
+}
+else
+{
+    @foreach (var notif in _notifications)
+    {
+        <MudPaper Elevation="1" Class="pa-3 mb-2 rounded-lg"
+                  Style="@(!notif.IsRead ? "border-left:3px solid #2563EB" : "")">
+            <div class="d-flex align-start justify-space-between">
+                <div class="d-flex align-start gap-3">
+                    <MudIcon Icon="@GetIcon(notif.Type)"
+                             Color="@(!notif.IsRead ? Color.Primary : Color.Default)"
+                             Size="Size.Small" Class="mt-1" />
+                    <div>
+                        <MudText Typo="Typo.subtitle2" Style="font-weight:600">
+                            @notif.Title
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @notif.Message
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @GetTimeAgo(notif.CreatedAt)
+                        </MudText>
+                    </div>
+                </div>
+                @if (!notif.IsRead)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Check"
+                                   Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="() => MarkRead(notif.Id)" />
+                }
+            </div>
+        </MudPaper>
+    }
+}
+
+@code {
+    private List<NotificationDto> _notifications = new();
+    private bool _loading = true;
+
+    protected override async Task OnPageInitializedAsync()
+    {
+        await LoadNotifications();
+    }
+
+    private async Task LoadNotifications()
+    {
+        _loading = true;
+        var result = await ApiClient.GetClient()
+            .GetFromJsonAsync<List<NotificationDto>>("api/notifications");
+        _notifications = result ?? new();
+        _loading = false;
+    }
+
+    private async Task MarkRead(int id)
+    {
+        await ApiClient.GetClient().PutAsync($"api/notifications/{id}/read", null);
+        await LoadNotifications();
+    }
+
+    private async Task MarkAllRead()
+    {
+        await ApiClient.GetClient().PutAsync("api/notifications/read-all", null);
+        await LoadNotifications();
+        Snackbar.Add("Tutte le notifiche segnate come lette.", Severity.Success);
+    }
+
+    private string GetIcon(string type) => type switch
+    {
+        "mention" => Icons.Material.Filled.AlternateEmail,
+        "assignment" => Icons.Material.Filled.Assignment,
+        "message" => Icons.Material.Filled.Message,
+        _ => Icons.Material.Filled.Notifications
+    };
+
+    private string GetTimeAgo(DateTime dt)
+    {
+        var diff = DateTime.UtcNow - dt;
+        if (diff.TotalMinutes < 1) return "ora";
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes}m fa";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h fa";
+        return $"{(int)diff.TotalDays}g fa";
+    }
+
+    private record NotificationDto(int Id, string Type, string Title,
+        string Message, string? EntityId, string? EntityType,
+        bool IsRead, DateTime CreatedAt);
+}

@@ -1,0 +1,205 @@
+﻿@page "/chat"
+@rendermode InteractiveServer
+@using MudBlazor
+@using Web.Services
+@using Microsoft.AspNetCore.Components.Web
+@inherits AppPageBase
+@inject ISnackbar Snackbar
+
+<PageTitle>Chat — MySolutionHub</PageTitle>
+
+@if (!_initialized)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    return;
+}
+
+@if (!AuthState.IsAuthenticated)
+{
+    Nav.NavigateTo("/login");
+    return;
+}
+
+<MudText Typo="Typo.h6" Class="mb-4" Style="font-weight:700">
+    💬 Messaggi
+</MudText>
+
+<MudGrid>
+    <!-- Lista conversazioni -->
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="1" Class="rounded-lg" Style="height:600px;overflow-y:auto">
+            <MudList T="ConversationDto" @bind-SelectedValue="_selectedConversation">
+                @if (_conversations.Any())
+                {
+                    @foreach (var conv in _conversations)
+                    {
+                        <MudListItem Value="conv" OnClick="() => SelectConversation(conv)">
+                            <div class="d-flex align-center gap-2">
+                                <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                    @(conv.Title?[0] ?? '?')
+                                </MudAvatar>
+                                <div style="flex:1;min-width:0">
+                                    <div class="d-flex justify-space-between">
+                                        <MudText Typo="Typo.subtitle2" Style="font-weight:600">
+                                            @conv.Title
+                                        </MudText>
+                                        @if (conv.UnreadCount > 0)
+                                        {
+                                            <MudBadge Content="@conv.UnreadCount"
+                                                      Color="Color.Primary" />
+                                        }
+                                    </div>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary"
+                                             Style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                                        @conv.LastMessageBody
+                                    </MudText>
+                                </div>
+                            </div>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                }
+                else
+                {
+                    <div class="pa-4 text-center">
+                        <MudText Color="Color.Secondary">Nessuna conversazione</MudText>
+                    </div>
+                }
+            </MudList>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Finestra messaggi -->
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="1" Class="rounded-lg d-flex flex-column" Style="height:600px">
+            @if (_selectedConversation is null)
+            {
+                <div class="d-flex align-center justify-center" style="height:100%">
+                    <div class="text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Chat"
+                                 Size="Size.Large" Color="Color.Secondary" />
+                        <MudText Color="Color.Secondary" Class="mt-2">
+                            Seleziona una conversazione
+                        </MudText>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- Header conversazione -->
+                <div class="d-flex align-center pa-3 border-bottom">
+                    <MudAvatar Color="Color.Secondary" Size="Size.Small" Class="mr-2">
+                        @(_selectedConversation.Title?[0] ?? '?')
+                    </MudAvatar>
+                    <MudText Typo="Typo.subtitle1" Style="font-weight:600">
+                        @_selectedConversation.Title
+                    </MudText>
+                </div>
+
+                <!-- Messaggi -->
+                <div style="flex:1;overflow-y:auto;padding:16px" id="messages-container">
+                    @foreach (var msg in _messages)
+                    {
+                        <div class="d-flex @(msg.IsOwn ? "justify-end" : "justify-start") mb-2">
+                            @if (!msg.IsOwn)
+                            {
+                                <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-2 mt-1">
+                                    @msg.SenderUsername[0]
+                                </MudAvatar>
+                            }
+                            <div style="max-width:70%">
+                                @if (!msg.IsOwn)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @msg.SenderUsername
+                                    </MudText>
+                                }
+                                <MudPaper Elevation="0" Class="pa-2 rounded-lg"
+                                          Style="@(msg.IsOwn ? "background:#2563EB;color:white" : "background:#F1F5F9")">
+                                    <MudText Typo="Typo.body2">@msg.Body</MudText>
+                                </MudPaper>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary"
+                                         Class="@(msg.IsOwn ? "text-right" : "")">
+                                    @msg.SentAt.ToString("HH:mm")
+                                </MudText>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Input messaggio -->
+                <div class="pa-3 border-top d-flex gap-2">
+                    <MudTextField @bind-Value="_newMessage"
+                                  Placeholder="Scrivi un messaggio..."
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  FullWidth="true"
+                                  OnKeyDown="HandleKeyDown" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Send"
+                                   Color="Color.Primary"
+                                   Variant="Variant.Filled"
+                                   OnClick="SendMessage" />
+                </div>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private List<ConversationDto> _conversations = new();
+    private ConversationDto? _selectedConversation;
+    private List<MessageDto> _messages = new();
+    private string _newMessage = "";
+
+    protected override async Task OnPageInitializedAsync()
+    {
+        await LoadConversations();
+    }
+
+    private async Task LoadConversations()
+    {
+        var result = await ApiClient.GetClient()
+            .GetFromJsonAsync<List<ConversationDto>>("api/chat/conversations");
+        _conversations = result ?? new();
+    }
+
+    private async Task SelectConversation(ConversationDto conv)
+    {
+        _selectedConversation = conv;
+        var result = await ApiClient.GetClient()
+            .GetFromJsonAsync<List<MessageDto>>(
+                $"api/chat/conversations/{conv.Id}/messages");
+        _messages = result ?? new();
+        await ApiClient.GetClient()
+            .PutAsync($"api/chat/conversations/{conv.Id}/read", null);
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_newMessage) || _selectedConversation is null) return;
+
+        var response = await ApiClient.GetClient()
+            .PostAsJsonAsync(
+                $"api/chat/conversations/{_selectedConversation.Id}/messages",
+                new { body = _newMessage, attachmentUrl = (string?)null });
+
+        if (response.IsSuccessStatusCode)
+        {
+            _newMessage = "";
+            await SelectConversation(_selectedConversation);
+        }
+    }
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SendMessage();
+    }
+
+    private record ConversationDto(int Id, string? Title, bool IsGroup,
+        DateTime? LastMessageAt, string? LastMessageBody,
+        int UnreadCount, List<object> Participants);
+
+    private record MessageDto(int Id, int ConversationId, int SenderId,
+        string SenderUsername, string? SenderAvatar, string Body,
+        DateTime SentAt, bool IsOwn);
+}
+}

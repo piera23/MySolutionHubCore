@@ -11,14 +11,26 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "MySolutionHub API", Version = "v1" });
+
+    // Header X-Tenant-Id per sviluppo
+    c.AddSecurityDefinition("TenantId", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "Inserisci il TenantId (es. cliente1)",
+        Name = "X-Tenant-Id",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "ApiKey"
+    });
+
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header. Inserisci: Bearer {token}",
+        Description = "JWT Authorization. Inserisci: Bearer {token}",
         Name = "Authorization",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
+
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
@@ -28,6 +40,17 @@ builder.Services.AddSwaggerGen(c =>
                 {
                     Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
                     Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        },
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "TenantId"
                 }
             },
             Array.Empty<string>()

@@ -1,0 +1,159 @@
+﻿@page "/login"
+@rendermode InteractiveServer
+@using MudBlazor
+@using Web.Services
+@inject AuthStateService AuthState
+@inject NavigationManager Nav
+@inject ApiHttpClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Login — MySolutionHub</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-8">
+    <MudItem xs="12" sm="8" md="5" lg="4">
+        <MudPaper Elevation="3" Class="pa-6 rounded-lg">
+
+            <div class="d-flex justify-center mb-4">
+                <MudText Typo="Typo.h5" Style="font-weight:700;color:#2563EB">
+                    MySolutionHub
+                </MudText>
+            </div>
+
+            <MudText Typo="Typo.subtitle1" Align="Align.Center" Class="mb-6" Color="Color.Secondary">
+                Accedi al tuo account
+            </MudText>
+
+            <MudTextField @bind-Value="_email"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email"
+                          FullWidth="true"
+                          Class="mb-3" />
+
+            <MudTextField @bind-Value="_password"
+                          Label="Password"
+                          Variant="Variant.Outlined"
+                          InputType="_passwordInputType"
+                          FullWidth="true"
+                          Class="mb-4"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@_passwordIcon"
+                          OnAdornmentClick="TogglePassword" />
+
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Disabled="_loading"
+                       OnClick="HandleLogin"
+                       Class="mb-3">
+                @if (_loading)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
+                Accedi
+            </MudButton>
+
+            <MudDivider Class="my-3" />
+
+            <MudText Typo="Typo.body2" Align="Align.Center">
+                Non hai un account?
+                <MudLink Href="/register">Registrati</MudLink>
+            </MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string _email = "";
+    private string _password = "";
+    private bool _loading = false;
+    private bool _navigateToHome = false;
+    private InputType _passwordInputType = InputType.Password;
+    private string _passwordIcon = Icons.Material.Filled.VisibilityOff;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_navigateToHome)
+        {
+            _navigateToHome = false;
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_password))
+        {
+            Snackbar.Add("Inserisci email e password.", Severity.Warning);
+            return;
+        }
+
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var http = ApiClient.GetClient();
+
+            var response = await http.PostAsJsonAsync("api/auth/login", new
+            {
+                email = _email,
+                password = _password
+            });
+
+            var content = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Status: {response.StatusCode}");
+            Console.WriteLine($"Response: {content}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = System.Text.Json.JsonSerializer.Deserialize<AuthResponse>(
+                    content,
+                    new System.Text.Json.JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+
+                if (result is not null)
+                {
+                    await AuthState.SetUserAsync(result.Token, result.Username,result.Email, result.UserType);
+
+                    Console.WriteLine($"Login OK — navigating to home");
+                    _navigateToHome = true;
+                }
+            }
+            else
+            {
+                Snackbar.Add($"Errore {(int)response.StatusCode}: {content}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Eccezione: {ex}");
+            Snackbar.Add($"Errore: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void TogglePassword()
+    {
+        if (_passwordInputType == InputType.Password)
+        {
+            _passwordInputType = InputType.Text;
+            _passwordIcon = Icons.Material.Filled.Visibility;
+        }
+        else
+        {
+            _passwordInputType = InputType.Password;
+            _passwordIcon = Icons.Material.Filled.VisibilityOff;
+        }
+    }
+
+    private record AuthResponse(string Token, string Username,
+        string Email, string UserType, DateTime ExpiresAt);
+}

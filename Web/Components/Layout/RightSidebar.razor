@@ -1,0 +1,33 @@
+﻿@using MudBlazor
+
+<MudPaper Elevation="1" Class="pa-3 rounded-lg">
+    <MudText Typo="Typo.subtitle2" Class="mb-3" Style="font-weight:600">
+        🟢 Utenti Online
+    </MudText>
+
+    @foreach (var user in _onlineUsers)
+    {
+        <div class="d-flex align-center mb-2">
+            <MudBadge Color="Color.Success" Overlap="true" Dot="true">
+                <MudAvatar Color="Color.Primary" Size="Size.Small">
+                    @user[0]
+                </MudAvatar>
+            </MudBadge>
+            <MudText Typo="Typo.body2" Class="ml-2">@user</MudText>
+        </div>
+    }
+
+    <MudDivider Class="my-3" />
+
+    <MudText Typo="Typo.subtitle2" Class="mb-3" Style="font-weight:600">
+        💡 Suggerimenti
+    </MudText>
+    <MudText Typo="Typo.caption" Color="Color.Secondary">
+        Segui altri utenti per vedere le loro attività nel feed.
+    </MudText>
+</MudPaper>
+
+@code {
+    // Placeholder — verrà popolato da SignalR
+    private List<string> _onlineUsers = new() { "mario.rossi", "luigi.verdi" };
+}

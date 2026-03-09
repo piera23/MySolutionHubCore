@@ -1,7 +1,180 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@using MudBlazor
+@using Web.Services
+@inherits AppPageBase
+@inject ISnackbar Snackbar
+<PageTitle>Feed — MySolutionHub</PageTitle>
 
-<PageTitle>Home</PageTitle>
+@if (!_initialized)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    return;
+}
 
-<h1>Hello, world!</h1>
+@if (!AuthState.IsAuthenticated)
+{
+    Nav.NavigateTo("/login");
+    return;
+}
 
-Welcome to your new app.
+<MudText Typo="Typo.h6" Class="mb-4" Style="font-weight:700">
+    🏠 Il tuo Feed
+</MudText>
+
+<!-- Box scrivi attività -->
+<MudPaper Elevation="1" Class="pa-4 mb-4 rounded-lg">
+    <div class="d-flex align-center gap-3">
+        <MudAvatar Color="Color.Primary">@AuthState.Username?[0]</MudAvatar>
+        <MudTextField @bind-Value="_newActivity"
+                      Placeholder="Cosa stai facendo?"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Margin="Margin.Dense" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="PublishActivity"
+                   Disabled="_publishing">
+            Pubblica
+        </MudButton>
+    </div>
+</MudPaper>
+
+<!-- Feed -->
+@if (_loading)
+{
+    @for (int i = 0; i < 3; i++)
+    {
+        <MudPaper Elevation="1" Class="pa-4 mb-3 rounded-lg">
+            <MudSkeleton SkeletonType="SkeletonType.Circle" Width="40px" Height="40px" />
+            <MudSkeleton Width="60%" Class="mt-2" />
+            <MudSkeleton Width="90%" Class="mt-1" />
+        </MudPaper>
+    }
+}
+else if (!_feedItems.Any())
+{
+    <MudPaper Elevation="1" Class="pa-6 rounded-lg text-center">
+        <MudIcon Icon="@Icons.Material.Filled.DynamicFeed"
+                 Size="Size.Large" Color="Color.Secondary" />
+        <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-2">
+            Il feed è vuoto. Inizia a seguire altri utenti!
+        </MudText>
+    </MudPaper>
+}
+else
+{
+    @foreach (var item in _feedItems)
+    {
+        <MudPaper Elevation="1" Class="pa-4 mb-3 rounded-lg">
+            <div class="d-flex align-start gap-3">
+                <MudAvatar Color="Color.Primary" Size="Size.Medium">
+                    @item.Username[0]
+                </MudAvatar>
+                <div style="flex:1">
+                    <div class="d-flex align-center justify-space-between">
+                        <MudText Typo="Typo.subtitle2" Style="font-weight:600">
+                            @item.Username
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            @GetTimeAgo(item.CreatedAt)
+                        </MudText>
+                    </div>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary"
+                             Variant="Variant.Outlined" Class="mt-1 mb-2">
+                        @item.EventType
+                    </MudChip>
+                    @if (!string.IsNullOrEmpty(item.Payload))
+                    {
+                        <MudText Typo="Typo.body2">@item.Payload</MudText>
+                    }
+                    <div class="d-flex align-center gap-3 mt-2">
+                        <MudButton StartIcon="@(item.HasReacted ? Icons.Material.Filled.Favorite : Icons.Material.Outlined.FavoriteBorder)"
+                                   Color="@(item.HasReacted ? Color.Error : Color.Default)"
+                                   Size="Size.Small"
+                                   Variant="Variant.Text"
+                                   OnClick="() => React(item)">
+                            @item.ReactionsCount
+                        </MudButton>
+                    </div>
+                </div>
+            </div>
+        </MudPaper>
+    }
+}
+
+@code {
+    private List<ActivityEventDto> _feedItems = new();
+    private bool _loading = true;
+    private bool _publishing = false;
+    private string _newActivity = "";
+
+    protected override async Task OnPageInitializedAsync()
+    {
+        await LoadFeed();
+    }
+
+    private async Task LoadFeed()
+    {
+        _loading = true;
+        try
+        {
+            var result = await ApiClient.GetClient().GetFromJsonAsync<List<ActivityEventDto>>("api/feed");
+            _feedItems = result ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Errore caricamento feed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task PublishActivity()
+    {
+        if (string.IsNullOrWhiteSpace(_newActivity)) return;
+
+        _publishing = true;
+        try
+        {
+            var response = await ApiClient.GetClient().PostAsJsonAsync("api/feed/publish", new
+            {
+                eventType = "user.post",
+                payload = _newActivity
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                _newActivity = "";
+                await LoadFeed();
+                Snackbar.Add("Attività pubblicata!", Severity.Success);
+            }
+        }
+        finally
+        {
+            _publishing = false;
+        }
+    }
+
+    private async Task React(ActivityEventDto item)
+    {
+        await ApiClient.GetClient().PostAsync($"api/feed/{item.Id}/react", null);
+        await LoadFeed();
+    }
+
+    private string GetTimeAgo(DateTime dt)
+    {
+        var diff = DateTime.UtcNow - dt;
+        if (diff.TotalMinutes < 1) return "ora";
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes}m fa";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h fa";
+        return $"{(int)diff.TotalDays}g fa";
+    }
+
+    private record ActivityEventDto(int Id, int UserId, string Username,
+        string? AvatarUrl, string EventType, string? EntityId,
+        string? EntityType, string? Payload, int ReactionsCount,
+        bool HasReacted, DateTime CreatedAt);
+}
