@@ -1,6 +1,8 @@
 ﻿@using MudBlazor
+@using Web.Services
+@inject AuthStateService AuthState
 
-<MudNavMenu>
+<MudNavMenu>  
     <MudNavLink Href="/" Match="NavLinkMatch.All"
                 Icon="@Icons.Material.Filled.Home">
         Home / Feed
@@ -34,5 +36,13 @@
             Tenant
         </MudNavLink>
     </MudNavGroup>
+    @if (!AuthState.IsAuthenticated)
+    {
+        <MudNavLink Href="/register"
+                    Icon="@Icons.Material.Filled.PersonAdd"
+                    Match="NavLinkMatch.All">
+            Registrati
+        </MudNavLink>
+    }
 </MudNavMenu>
 

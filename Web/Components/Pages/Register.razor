@@ -112,7 +112,7 @@
                    FullWidth="true"
                    Size="Size.Large"
                    Class="mt-4"
-                   OnClick="Register"
+                   OnClick="HandleRegister"
                    Disabled="_loading"
                    Style="font-weight:700;height:48px">
             @if (_loading)
@@ -245,7 +245,7 @@
         return valid;
     }
 
-    private async Task Register()
+    private async Task HandleRegister()
     {
         if (!Validate()) return;
 
