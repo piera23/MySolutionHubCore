@@ -17,15 +17,16 @@ namespace MasterDb.Persistence.Migrations
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    TenantId = table.Column<string>(type: "TEXT", maxLength: 50, nullable: false),
-                    Subdomain = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
+                    TenantId = table.Column<string>(type: "TEXT", nullable: false),
+                    Subdomain = table.Column<string>(type: "TEXT", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Tenants", x => x.Id);
+                    table.UniqueConstraint("AK_Tenants_TenantId", x => x.TenantId);
                 });
 
             migrationBuilder.CreateTable(
@@ -34,10 +35,10 @@ namespace MasterDb.Persistence.Migrations
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    TenantId = table.Column<int>(type: "INTEGER", nullable: false),
+                    TenantId = table.Column<string>(type: "TEXT", nullable: false),
                     ConnectionStringEncrypted = table.Column<string>(type: "TEXT", nullable: false),
                     DbVersion = table.Column<string>(type: "TEXT", nullable: false),
-                    Region = table.Column<string>(type: "TEXT", nullable: true),
+                    Region = table.Column<string>(type: "TEXT", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
@@ -47,7 +48,7 @@ namespace MasterDb.Persistence.Migrations
                         name: "FK_TenantConnections_Tenants_TenantId",
                         column: x => x.TenantId,
                         principalTable: "Tenants",
-                        principalColumn: "Id",
+                        principalColumn: "TenantId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -57,8 +58,8 @@ namespace MasterDb.Persistence.Migrations
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    TenantId = table.Column<int>(type: "INTEGER", nullable: false),
-                    FeatureKey = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    TenantId = table.Column<string>(type: "TEXT", nullable: false),
+                    FeatureKey = table.Column<string>(type: "TEXT", nullable: false),
                     IsEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
                     Config = table.Column<string>(type: "TEXT", nullable: true)
                 },
@@ -69,7 +70,7 @@ namespace MasterDb.Persistence.Migrations
                         name: "FK_TenantFeatures_Tenants_TenantId",
                         column: x => x.TenantId,
                         principalTable: "Tenants",
-                        principalColumn: "Id",
+                        principalColumn: "TenantId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -79,7 +80,7 @@ namespace MasterDb.Persistence.Migrations
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
-                    TenantId = table.Column<int>(type: "INTEGER", nullable: false),
+                    TenantId = table.Column<string>(type: "TEXT", nullable: false),
                     MigrationId = table.Column<string>(type: "TEXT", nullable: false),
                     AppliedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
@@ -92,7 +93,7 @@ namespace MasterDb.Persistence.Migrations
                         name: "FK_TenantMigrationLogs_Tenants_TenantId",
                         column: x => x.TenantId,
                         principalTable: "Tenants",
-                        principalColumn: "Id",
+                        principalColumn: "TenantId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -102,10 +103,9 @@ namespace MasterDb.Persistence.Migrations
                 column: "TenantId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_TenantFeatures_TenantId_FeatureKey",
+                name: "IX_TenantFeatures_TenantId",
                 table: "TenantFeatures",
-                columns: new[] { "TenantId", "FeatureKey" },
-                unique: true);
+                column: "TenantId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TenantMigrationLogs_TenantId",

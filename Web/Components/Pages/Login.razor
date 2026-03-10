@@ -56,10 +56,15 @@
 
             <MudDivider Class="my-3" />
 
-            <MudText Typo="Typo.body2" Align="Align.Center">
-                Non hai un account?
-                <MudLink Href="/register">Registrati</MudLink>
-            </MudText>
+            <MudDivider Class="my-4" />
+            <div class="text-center">
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Non hai un account?
+                    <MudLink Href="/register" Color="Color.Primary" Style="font-weight:600">
+                        Registrati
+                    </MudLink>
+                </MudText>
+            </div>
         </MudPaper>
     </MudItem>
 </MudGrid>
@@ -117,7 +122,16 @@
 
                 if (result is not null)
                 {
-                    await AuthState.SetUserAsync(result.Token, result.Username,result.Email, result.UserType);
+                    // Estrai il tenant dal URL corrente
+                    var uri = new Uri(Nav.Uri);
+                    var host = uri.Host;
+                    var tenantSubdomain = host.Contains('.') ? host.Split('.')[0] : "cliente1"; // fallback per localhost
+
+                    await AuthState.SetUserAsync(
+                        result.Token, result.Username,
+                        result.Email, result.UserType,
+                        tenantSubdomain);
+                    //await AuthState.SetUserAsync(result.Token, result.Username,result.Email, result.UserType);
 
                     Console.WriteLine($"Login OK — navigating to home");
                     _navigateToHome = true;

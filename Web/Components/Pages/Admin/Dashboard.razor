@@ -1,0 +1,182 @@
+﻿@page "/admin/stats"
+@rendermode InteractiveServer
+@using MudBlazor
+@inherits AppPageBase
+@inject ISnackbar Snackbar
+
+<PageTitle>Admin — Dashboard</PageTitle>
+
+@if (!_initialized)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    return;
+}
+
+<MudText Typo="Typo.h6" Style="font-weight:700" Class="mb-4">
+    📊 Dashboard Admin
+</MudText>
+
+<!-- Stats cards -->
+<MudGrid Class="mb-6">
+    <MudItem xs="12" sm="6" md="4">
+        <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+            <div class="d-flex align-center justify-space-between">
+                <div>
+                    <MudText Typo="Typo.h3" Style="font-weight:700;color:#2563EB">
+                        @_stats?.TotalTenants
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Tenant Totali
+                    </MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Business"
+                         Style="font-size:3rem;color:#2563EB;opacity:0.2" />
+            </div>
+            <MudDivider Class="my-2" />
+            <div class="d-flex gap-3">
+                <MudText Typo="Typo.caption" Color="Color.Success">
+                    ✅ @_stats?.ActiveTenants attivi
+                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Error">
+                    ❌ @_stats?.InactiveTenants inattivi
+                </MudText>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+            <div class="d-flex align-center justify-space-between">
+                <div>
+                    <MudText Typo="Typo.h3" Style="font-weight:700;color:#7C3AED">
+                        @_stats?.EnabledFeatures
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Feature Attive
+                    </MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.ToggleOn"
+                         Style="font-size:3rem;color:#7C3AED;opacity:0.2" />
+            </div>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Totale feature abilitate su tutti i tenant
+            </MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudPaper Elevation="2" Class="pa-4 rounded-lg">
+            <div class="d-flex align-center justify-space-between">
+                <div>
+                    <MudText Typo="Typo.h3"
+                             Style="@($"font-weight:700;color:{(_stats?.FailedMigrations > 0 ? "#DC2626" : "#16A34A")}")">
+                        @_stats?.FailedMigrations
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Migration Fallite
+                    </MudText>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.Storage"
+                         Style="font-size:3rem;opacity:0.2"
+                         Color="@(_stats?.FailedMigrations > 0 ? Color.Error : Color.Success)" />
+            </div>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Totale migration: @_stats?.TotalMigrations
+            </MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<!-- Lista tenant con accesso rapido -->
+<MudPaper Elevation="1" Class="rounded-lg pa-4 mb-4">
+    <MudText Typo="Typo.subtitle1" Style="font-weight:700" Class="mb-3">
+        🏢 Stato Tenant
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        @foreach (var tenant in _tenants)
+        {
+            <MudPaper Elevation="0" Class="pa-3 mb-2 rounded"
+                      Style="background:#F8FAFC;border:1px solid #E2E8F0">
+                <div class="d-flex align-center justify-space-between">
+                    <div class="d-flex align-center gap-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Circle"
+                                 Size="Size.Small"
+                                 Color="@(tenant.IsActive ? Color.Success : Color.Error)" />
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Style="font-weight:600">
+                                @tenant.Name
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @tenant.TenantId · @($"{tenant.Subdomain}.localhost")
+                            </MudText>
+                        </div>
+                    </div>
+                    <div class="d-flex align-center gap-2">
+                        <div class="d-flex gap-1">
+                            @foreach (var f in tenant.Features.Where(f => f.IsEnabled))
+                            {
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="Color.Primary"
+                                         Variant="Variant.Outlined">
+                                    @f.FeatureKey.Replace("social:", "")
+                                </MudChip>
+                            }
+                        </div>
+                        <MudButton Size="Size.Small"
+                                   Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Href="@($"/admin/tenants/{tenant.TenantId}")">
+                            Dettagli
+                        </MudButton>
+                    </div>
+                </div>
+            </MudPaper>
+        }
+    }
+</MudPaper>
+
+@code {
+    private StatsDto? _stats;
+    private List<TenantDto> _tenants = new();
+    private bool _loading = true;
+
+    protected override async Task OnPageInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        var options = new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+        _stats = await ApiClient.GetClient()
+            .GetFromJsonAsync<StatsDto>("api/admin/stats", options);
+
+        _tenants = await ApiClient.GetClient()
+            .GetFromJsonAsync<List<TenantDto>>("api/admin/tenants", options) ?? new();
+
+        _loading = false;
+    }
+
+    private record StatsDto(int TotalTenants, int ActiveTenants,
+        int InactiveTenants, int EnabledFeatures,
+        int TotalMigrations, int FailedMigrations);
+
+    private record TenantDto(int Id, string TenantId, string Subdomain,
+        string Name, bool IsActive, DateTime CreatedAt,
+        int ConnectionsCount, List<FeatureDto> Features);
+
+    private record FeatureDto(string FeatureKey, bool IsEnabled, string? Config);
+}

@@ -12,6 +12,7 @@ namespace Web.Services
         public string? UserType { get; private set; }
         public int UserId { get; private set; }
         public bool IsAuthenticated => !string.IsNullOrEmpty(Token);
+        public string? TenantSubdomain { get; private set; }
 
         public event Action? OnChange;
 
@@ -28,6 +29,7 @@ namespace Web.Services
                 var username = await _storage.GetAsync<string>("auth_username");
                 var email = await _storage.GetAsync<string>("auth_email");
                 var userType = await _storage.GetAsync<string>("auth_usertype");
+                var tenant = await _storage.GetAsync<string>("auth_tenant");
 
                 if (token.Success && !string.IsNullOrEmpty(token.Value))
                 {
@@ -35,24 +37,27 @@ namespace Web.Services
                     Username = username.Value;
                     Email = email.Value;
                     UserType = userType.Value;
+                    TenantSubdomain = tenant.Value ?? "cliente1";
                     ExtractUserId();
                 }
             }
-            catch { /* pre-render — ignora */ }
+            catch { }
         }
 
-        public async Task SetUserAsync(string token, string username, string email, string userType)
+        public async Task SetUserAsync(string token, string username, string email, string userType, string tenantSubdomain = "cliente1")
         {
             Token = token;
             Username = username;
             Email = email;
             UserType = userType;
+            TenantSubdomain = tenantSubdomain;
             ExtractUserId();
 
             await _storage.SetAsync("auth_token", token);
             await _storage.SetAsync("auth_username", username);
             await _storage.SetAsync("auth_email", email);
             await _storage.SetAsync("auth_usertype", userType);
+            await _storage.SetAsync("auth_tenant", tenantSubdomain);
 
             NotifyStateChanged();
         }
@@ -63,12 +68,14 @@ namespace Web.Services
             Username = null;
             Email = null;
             UserType = null;
+            TenantSubdomain = null;
             UserId = 0;
 
             await _storage.DeleteAsync("auth_token");
             await _storage.DeleteAsync("auth_username");
             await _storage.DeleteAsync("auth_email");
             await _storage.DeleteAsync("auth_usertype");
+            await _storage.DeleteAsync("auth_tenant");
 
             NotifyStateChanged();
         }

@@ -31,17 +31,14 @@ namespace MasterDb.Persistence.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Subdomain")
                         .IsRequired()
-                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("TenantId")
                         .IsRequired()
-                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -70,10 +67,12 @@ namespace MasterDb.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Region")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("TenantId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("TEXT");
@@ -96,19 +95,18 @@ namespace MasterDb.Persistence.Migrations
 
                     b.Property<string>("FeatureKey")
                         .IsRequired()
-                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("TenantId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("TenantId", "FeatureKey")
-                        .IsUnique();
+                    b.HasIndex("TenantId");
 
                     b.ToTable("TenantFeatures");
                 });
@@ -132,8 +130,9 @@ namespace MasterDb.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("TenantId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -144,35 +143,41 @@ namespace MasterDb.Persistence.Migrations
 
             modelBuilder.Entity("MasterDb.Entities.TenantConnection", b =>
                 {
-                    b.HasOne("MasterDb.Entities.Tenant", "Tenant")
-                        .WithMany()
+                    b.HasOne("MasterDb.Entities.Tenant", null)
+                        .WithMany("Connections")
                         .HasForeignKey("TenantId")
+                        .HasPrincipalKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("MasterDb.Entities.TenantFeature", b =>
                 {
-                    b.HasOne("MasterDb.Entities.Tenant", "Tenant")
-                        .WithMany()
+                    b.HasOne("MasterDb.Entities.Tenant", null)
+                        .WithMany("Features")
                         .HasForeignKey("TenantId")
+                        .HasPrincipalKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("MasterDb.Entities.TenantMigrationLog", b =>
                 {
-                    b.HasOne("MasterDb.Entities.Tenant", "Tenant")
-                        .WithMany()
+                    b.HasOne("MasterDb.Entities.Tenant", null)
+                        .WithMany("MigrationLogs")
                         .HasForeignKey("TenantId")
+                        .HasPrincipalKey("TenantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
 
-                    b.Navigation("Tenant");
+            modelBuilder.Entity("MasterDb.Entities.Tenant", b =>
+                {
+                    b.Navigation("Connections");
+
+                    b.Navigation("Features");
+
+                    b.Navigation("MigrationLogs");
                 });
 #pragma warning restore 612, 618
         }

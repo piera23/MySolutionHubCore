@@ -24,7 +24,7 @@ namespace Infrastructure.MultiTenant
             string tenantId,
             string tenantName,
             string connectionString,
-            IEnumerable<string> enabledFeatures = null,
+            IEnumerable<string>? enabledFeatures = null,
             Dictionary<string, string>? settings = null)
         {
             TenantId = tenantId;
@@ -32,8 +32,9 @@ namespace Infrastructure.MultiTenant
             ConnectionString = connectionString;
             _enabledFeatures.Clear();
 
-            foreach (var f in enabledFeatures)
-                _enabledFeatures.Add(f);
+            if (enabledFeatures is not null)
+                foreach (var f in enabledFeatures)
+                    _enabledFeatures.Add(f);
 
             Settings = settings ?? new Dictionary<string, string>();
         }

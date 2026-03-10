@@ -62,17 +62,41 @@
                Elevation="1"
                Variant="DrawerVariant.Responsive"
                ClipMode="DrawerClipMode.Always">
-        <MudDrawerHeader>
-            <MudText Typo="Typo.subtitle1" Style="font-weight:600">Menu</MudText>
-        </MudDrawerHeader>
-        <NavMenu />
-        <MudDivider Class="my-2" />
-        <MudNavMenu>
-            <MudNavLink Icon="@Icons.Material.Filled.Logout"
-                        OnClick="Logout">
-                Esci
-            </MudNavLink>
-        </MudNavMenu>
+
+        <div class="d-flex flex-column" style="height:100%">
+            <!-- Navigazione occupa tutto lo spazio -->
+            <div style="flex:1;overflow-y:auto;padding-top:8px">
+                <NavMenu />
+            </div>
+
+            <MudDivider />
+
+            <!-- Info utente + logout in fondo -->
+            <div class="pa-3">
+                <div class="d-flex align-center gap-2 mb-2">
+                    <MudAvatar Color="Color.Primary" Size="Size.Small">
+                        @_userInitial
+                    </MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.caption" Style="font-weight:600;line-height:1.2">
+                            @AuthState.Username
+                        </MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="line-height:1.2">
+                            @AuthState.TenantSubdomain
+                        </MudText>
+                    </div>
+                </div>
+                <MudButton FullWidth="true"
+                           Variant="Variant.Outlined"
+                           Color="Color.Error"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Logout"
+                           OnClick="Logout"
+                           Class="justify-start">
+                    Esci
+                </MudButton>
+            </div>
+        </div>
     </MudDrawer>
 
     <MudMainContent>

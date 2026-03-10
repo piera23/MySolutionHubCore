@@ -22,45 +22,48 @@ namespace Infrastructure.MultiTenant
             _logger = logger;
         }
 
-        public async Task InvokeAsync(HttpContext context,
-            ITenantResolver resolver,
-            TenantContext tenantContext)
+        public async Task InvokeAsync(HttpContext context, ITenantResolver resolver, TenantContext tenantContext)
         {
-            // 1. Prima prova l'header X-Tenant-Id (Swagger / server-side calls)
-            var subdomain = context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+            string? identifier = null;
 
-            // 2. Se non c'è header, prova a estrarre dal sottodominio
-            if (string.IsNullOrEmpty(subdomain))
+            // 1. Header esplicito (Swagger / chiamate server-side)
+            if (context.Request.Headers.TryGetValue("X-Tenant-Id", out var headerValue))
             {
-                subdomain = ExtractSubdomain(context.Request.Host.Host);
+                identifier = headerValue.ToString();
+            }
+            // 2. Query string (SignalR)
+            else if (context.Request.Query.TryGetValue("tenantId", out var queryValue))
+            {
+                identifier = queryValue.ToString();
+            }
+            // 3. Host completo senza porta (es. cliente1.localhost o cliente1.miodominio.com)
+            else
+            {
+                var host = context.Request.Host.Host; // senza porta
+                if (!string.IsNullOrEmpty(host) && host != "localhost")
+                    identifier = host;
             }
 
-            if (!string.IsNullOrEmpty(subdomain))
+            Console.WriteLine($"[Tenant] Identifier: {identifier}");
+
+            if (!string.IsNullOrEmpty(identifier))
             {
                 try
                 {
-                    var tenant = await resolver.ResolveAsync(subdomain);
+                    var tenant = await resolver.ResolveAsync(identifier);
                     if (tenant is not null)
                     {
-                        tenantContext.SetTenant(
-                            tenant.TenantId,
-                            tenant.TenantName,
-                            tenant.ConnectionString);
-
-                        _logger.LogDebug(
-                            "Tenant risolto: {TenantId} da '{Subdomain}'",
-                            tenant.TenantId, subdomain);
+                        Console.WriteLine($"[Tenant] Resolved: {tenant.TenantId}");
+                        tenantContext.SetTenant(tenant.TenantId, tenant.TenantName, tenant.ConnectionString);
                     }
                     else
                     {
-                        _logger.LogWarning(
-                            "Tenant non trovato per subdomain: {Subdomain}", subdomain);
+                        Console.WriteLine($"[Tenant] NOT FOUND: {identifier}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex,
-                        "Errore nella risoluzione del tenant: {Subdomain}", subdomain);
+                    _logger.LogError(ex, "Errore risoluzione tenant: {Identifier}", identifier);
                 }
             }
 

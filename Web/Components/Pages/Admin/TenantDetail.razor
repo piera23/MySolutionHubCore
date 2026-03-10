@@ -1,0 +1,336 @@
+﻿@page "/admin/tenants/{TenantId}"
+@rendermode InteractiveServer
+@using MudBlazor
+@inherits AppPageBase
+@inject ISnackbar Snackbar
+
+<PageTitle>Tenant @TenantId</PageTitle>
+
+@if (!_initialized)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    return;
+}
+
+@if (_tenant is null)
+{
+    <MudText>Tenant non trovato.</MudText>
+    return;
+}
+
+<!-- Header -->
+<div class="d-flex align-center justify-space-between mb-4">
+    <div class="d-flex align-center gap-2">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                       OnClick='() => Nav.NavigateTo("/admin/tenants")' />
+        <div>
+            <MudText Typo="Typo.h6" Style="font-weight:700">@_tenant.Name</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                @_tenant.TenantId · @($"{_tenant.Subdomain}.localhost")
+            </MudText>
+        </div>
+    </div>
+    <MudChip T="string"
+             Color="@(_tenant.IsActive ? Color.Success : Color.Error)">
+        @(_tenant.IsActive ? "Attivo" : "Inattivo")
+    </MudChip>
+</div>
+
+<MudTabs Elevation="1" Rounded="true" ApplyEffectsToContainer="true">
+
+    <!-- Tab Utenti -->
+    <MudTabPanel Text="👥 Utenti" Icon="@Icons.Material.Filled.People">
+        <div Class="pa-4">
+            @if (_loadingUsers)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else
+            {
+                <MudTable Items="_users" Hover="true" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Username</MudTh>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Nome</MudTh>
+                        <MudTh>Tipo</MudTh>
+                        <MudTh>Stato</MudTh>
+                        <MudTh>Ultimo accesso</MudTh>
+                        <MudTh>Azioni</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <div class="d-flex align-center gap-2">
+                                <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                    @context.UserName[0]
+                                </MudAvatar>
+                                @context.UserName
+                            </div>
+                        </MudTd>
+                        <MudTd>@context.Email</MudTd>
+                        <MudTd>@context.FirstName @context.LastName</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(context.UserType == 0 ? Color.Primary : Color.Secondary)"
+                                     Variant="Variant.Outlined">
+                                @(context.UserType == 0 ? "Internal" : "External")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(context.IsActive ? Color.Success : Color.Error)">
+                                @(context.IsActive ? "Attivo" : "Inattivo")
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            <MudText Typo="Typo.caption">
+                                @(context.LastLoginAt?.ToString("dd/MM/yyyy HH:mm") ?? "Mai")
+                            </MudText>
+                        </MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@(context.IsActive
+                                    ? Icons.Material.Filled.Block
+                                    : Icons.Material.Filled.CheckCircle)"
+                                           Size="Size.Small"
+                                           Color="@(context.IsActive ? Color.Error : Color.Success)"
+                                           OnClick="() => ToggleUser(context)" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </div>
+    </MudTabPanel>
+
+    <!-- Tab Feature -->
+    <MudTabPanel Text="⚙️ Feature" Icon="@Icons.Material.Filled.ToggleOn">
+        <div Class="pa-4">
+            <MudGrid>
+                @foreach (var feature in _tenant.Features)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudPaper Elevation="1" Class="pa-3 rounded-lg">
+                            <div class="d-flex align-center justify-space-between">
+                                <div>
+                                    <MudText Typo="Typo.subtitle2" Style="font-weight:600">
+                                        @feature.FeatureKey
+                                    </MudText>
+                                    @if (!string.IsNullOrEmpty(feature.Config))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            @feature.Config
+                                        </MudText>
+                                    }
+                                </div>
+                                <MudSwitch T="bool"
+                                           Value="feature.IsEnabled"
+                                           ValueChanged="async v => await ToggleFeature(feature.FeatureKey, v)"
+                                           Color="Color.Primary" />
+                            </div>
+                        </MudPaper>
+                    </MudItem>
+                }
+
+                <!-- Aggiungi feature custom -->
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Elevation="0" Class="pa-3 rounded-lg"
+                              Style="border:2px dashed #CBD5E1;cursor:pointer"
+                              @onclick="OpenAddFeatureDialog">
+                        <div class="d-flex align-center justify-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Add"
+                                     Color="Color.Secondary" />
+                            <MudText Color="Color.Secondary">Aggiungi Feature</MudText>
+                        </div>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </div>
+    </MudTabPanel>
+
+    <!-- Tab Migration Logs -->
+    <MudTabPanel Text="📋 Migration Log" Icon="@Icons.Material.Filled.History">
+        <div Class="pa-4">
+            @if (_migrationLogs.Any())
+            {
+                <MudTable Items="_migrationLogs" Hover="true" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Migration ID</MudTh>
+                        <MudTh>Data</MudTh>
+                        <MudTh>Stato</MudTh>
+                        <MudTh>Errore</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudText Typo="Typo.body2"
+                                     Style="font-family:monospace;font-size:0.75rem">
+                                @context.MigrationId
+                            </MudText>
+                        </MudTd>
+                        <MudTd>@context.AppliedAt.ToString("dd/MM/yyyy HH:mm")</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(context.Status == "Completed"
+                                         ? Color.Success
+                                         : context.Status == "Failed"
+                                             ? Color.Error
+                                             : Color.Warning)">
+                                @context.Status
+                            </MudChip>
+                        </MudTd>
+                        <MudTd>
+                            @if (!string.IsNullOrEmpty(context.ErrorMessage))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Error">
+                                    @context.ErrorMessage
+                                </MudText>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+            else
+            {
+                <MudText Color="Color.Secondary">Nessun log disponibile.</MudText>
+            }
+        </div>
+    </MudTabPanel>
+
+</MudTabs>
+
+<!-- Dialog aggiungi feature -->
+<MudDialog @bind-Visible="_showAddFeature">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Aggiungi Feature</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_newFeatureKey"
+                      Label="Feature Key"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      HelperText="es. reporting:dashboard" />
+        <MudTextField @bind-Value="_newFeatureConfig"
+                      Label="Config (JSON opzionale)"
+                      Variant="Variant.Outlined"
+                      FullWidth="true"
+                      Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showAddFeature = false">Annulla</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="AddFeature">
+            Aggiungi
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public string TenantId { get; set; } = "";
+
+    private TenantDetailDto? _tenant;
+    private List<UserDto> _users = new();
+    private List<MigrationLogDto> _migrationLogs = new();
+    private bool _loadingUsers = false;
+    private bool _showAddFeature = false;
+    private string _newFeatureKey = "";
+    private string _newFeatureConfig = "";
+
+    private readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+    protected override async Task OnPageInitializedAsync()
+    {
+        await LoadTenant();
+        await LoadUsers();
+        await LoadMigrationLogs();
+    }
+
+    private async Task LoadTenant()
+    {
+        _tenant = await ApiClient.GetClient()
+            .GetFromJsonAsync<TenantDetailDto>(
+                $"api/admin/tenants/{TenantId}", _jsonOptions);
+    }
+
+    private async Task LoadUsers()
+    {
+        _loadingUsers = true;
+        try
+        {
+            _users = await ApiClient.GetClient()
+                .GetFromJsonAsync<List<UserDto>>(
+                    $"api/admin/tenants/{TenantId}/users", _jsonOptions) ?? new();
+        }
+        finally
+        {
+            _loadingUsers = false;
+        }
+    }
+
+    private async Task LoadMigrationLogs()
+    {
+        _migrationLogs = await ApiClient.GetClient()
+            .GetFromJsonAsync<List<MigrationLogDto>>(
+                $"api/admin/tenants/{TenantId}/migrations", _jsonOptions) ?? new();
+    }
+
+    private async Task ToggleUser(UserDto user)
+    {
+        var response = await ApiClient.GetClient()
+            .PutAsync($"api/admin/tenants/{TenantId}/users/{user.Id}/toggle", null);
+
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadUsers();
+            Snackbar.Add(
+                $"Utente {(user.IsActive ? "disattivato" : "attivato")}!",
+                Severity.Success);
+        }
+    }
+
+    private async Task ToggleFeature(string featureKey, bool isEnabled)
+    {
+        await ApiClient.GetClient()
+            .PutAsJsonAsync(
+                $"api/admin/tenants/{TenantId}/features/{featureKey}",
+                new { isEnabled, config = (string?)null });
+
+        await LoadTenant();
+        Snackbar.Add($"Feature {featureKey} aggiornata!", Severity.Success);
+    }
+
+    private void OpenAddFeatureDialog()
+    {
+        _newFeatureKey = "";
+        _newFeatureConfig = "";
+        _showAddFeature = true;
+    }
+
+    private async Task AddFeature()
+    {
+        if (string.IsNullOrWhiteSpace(_newFeatureKey)) return;
+
+        await ApiClient.GetClient()
+            .PutAsJsonAsync(
+                $"api/admin/tenants/{TenantId}/features/{_newFeatureKey}",
+                new { isEnabled = true, config = _newFeatureConfig });
+
+        _showAddFeature = false;
+        await LoadTenant();
+        Snackbar.Add("Feature aggiunta!", Severity.Success);
+    }
+
+    // DTOs
+    private record TenantDetailDto(
+        int Id, string TenantId, string Subdomain,
+        string Name, bool IsActive, DateTime CreatedAt,
+        List<FeatureDto> Features,
+        List<ConnectionDto> Connections,
+        List<MigrationLogDto> MigrationLogs);
+
+    private record FeatureDto(int Id, string FeatureKey, bool IsEnabled, string? Config);
+    private record ConnectionDto(int Id, string DbVersion, string Region, DateTime UpdatedAt);
+    private record MigrationLogDto(string MigrationId, DateTime AppliedAt, string Status, string? ErrorMessage);
+    private record UserDto(int Id, string UserName, string Email,
+        string? FirstName, string? LastName, bool IsActive,
+        int UserType, DateTime? LastLoginAt, DateTime CreatedAt);
+}

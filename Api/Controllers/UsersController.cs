@@ -175,6 +175,22 @@ namespace Api.Controllers
 
             return NoContent();
         }
+
+        [HttpPost("{id}/make-admin")]
+        [AllowAnonymous] // temporaneo per setup
+        public async Task<IActionResult> MakeAdmin(int id)
+        {
+            var user = await _userManager.FindByIdAsync(id.ToString());
+            if (user is null) return NotFound();
+
+            if (!await _userManager.IsInRoleAsync(user, "Admin"))
+                await _userManager.AddToRoleAsync(user, "Admin");
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var token = _jwtService.GenerateToken(user, roles);
+
+            return Ok(new { user.UserName, Roles = roles, Token = token });
+        }
     }
 
     public record UpdateProfileRequest(

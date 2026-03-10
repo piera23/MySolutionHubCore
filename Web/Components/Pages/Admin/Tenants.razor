@@ -1,0 +1,469 @@
+﻿@page "/admin/tenants"
+@rendermode InteractiveServer
+@using MudBlazor
+@inherits AppPageBase
+@inject ISnackbar Snackbar
+
+<PageTitle>Admin — Tenant</PageTitle>
+
+@if (!_initialized)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    return;
+}
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h6" Style="font-weight:700">🏢 Gestione Tenant</MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add"
+               OnClick="OpenCreateDialog">
+        Nuovo Tenant
+    </MudButton>
+</div>
+
+@if (_stats is not null)
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <MudPaper Elevation="1" Class="pa-3 rounded-lg text-center">
+                <MudText Typo="Typo.h4" Color="Color.Primary" Style="font-weight:700">@_stats.TotalTenants</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Totali</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Elevation="1" Class="pa-3 rounded-lg text-center">
+                <MudText Typo="Typo.h4" Color="Color.Success" Style="font-weight:700">@_stats.ActiveTenants</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Attivi</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Elevation="1" Class="pa-3 rounded-lg text-center">
+                <MudText Typo="Typo.h4" Color="Color.Error" Style="font-weight:700">@_stats.InactiveTenants</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Inattivi</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudPaper Elevation="1" Class="pa-3 rounded-lg text-center">
+                <MudText Typo="Typo.h4" Color="Color.Secondary" Style="font-weight:700">@_stats.EnabledFeatures</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Feature Attive</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+<MudPaper Elevation="1" Class="rounded-lg">
+    <MudTable Items="_tenants" Hover="true" Dense="true"
+              Filter="FilterFunc" Loading="_loading"
+              LoadingProgressColor="Color.Primary">
+        <ToolBarContent>
+            <MudTextField @bind-Value="_searchText"
+                          Placeholder="Cerca per nome, TenantId, subdomain..."
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Immediate="true" />
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>TenantId</MudTh>
+            <MudTh>Nome</MudTh>
+            <MudTh>Subdomain</MudTh>
+            <MudTh>Stato</MudTh>
+            <MudTh>Feature</MudTh>
+            <MudTh>Creato</MudTh>
+            <MudTh Style="text-align:right">Azioni</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>
+                <MudText Typo="Typo.body2" Style="font-family:monospace;font-weight:600;color:#2563EB">
+                    @context.TenantId
+                </MudText>
+            </MudTd>
+            <MudTd>
+                <div class="d-flex align-center gap-2">
+                    <MudAvatar Color="Color.Primary" Size="Size.Small"
+                               Style="font-size:0.75rem;width:28px;height:28px">
+                        @context.Name[0]
+                    </MudAvatar>
+                    <MudText Typo="Typo.body2" Style="font-weight:600">@context.Name</MudText>
+                </div>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                    @($"{context.Subdomain}.localhost")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <MudChip T="string" Size="Size.Small"
+                         Color="@(context.IsActive ? Color.Success : Color.Error)">
+                    @(context.IsActive ? "✅ Attivo" : "❌ Inattivo")
+                </MudChip>
+            </MudTd>
+            <MudTd>
+                <div class="d-flex gap-1 flex-wrap">
+                    @foreach (var f in context.Features.Where(f => f.IsEnabled))
+                    {
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="Color.Secondary" Variant="Variant.Outlined">
+                            @f.FeatureKey.Replace("social:", "")
+                        </MudChip>
+                    }
+                    @if (!context.Features.Any(f => f.IsEnabled))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Nessuna</MudText>
+                    }
+                </div>
+            </MudTd>
+            <MudTd>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    @context.CreatedAt.ToString("dd/MM/yyyy")
+                </MudText>
+            </MudTd>
+            <MudTd Style="text-align:right">
+                <MudTooltip Text="Dettagli">
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                   Size="Size.Small" Color="Color.Primary"
+                                   OnClick="@(() => Nav.NavigateTo($"/admin/tenants/{context.TenantId}"))" />
+                </MudTooltip>
+                <MudTooltip Text="Modifica">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                   Size="Size.Small" Color="Color.Default"
+                                   OnClick="@(() => OpenEditDialog(context))" />
+                </MudTooltip>
+                <MudTooltip Text="@(context.IsActive ? "Disattiva" : "Attiva")">
+                    <MudIconButton Icon="@(context.IsActive ? Icons.Material.Filled.PauseCircle : Icons.Material.Filled.PlayCircle)"
+                                   Size="Size.Small"
+                                   Color="@(context.IsActive ? Color.Warning : Color.Success)"
+                                   OnClick="@(() => ToggleActive(context))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager PageSizeOptions="new int[]{10, 25, 50}" />
+        </PagerContent>
+        <NoRecordsContent>
+            <MudText Class="pa-4" Color="Color.Secondary">Nessun tenant trovato.</MudText>
+        </NoRecordsContent>
+    </MudTable>
+</MudPaper>
+
+<!-- Dialog Crea -->
+<MudDialog @bind-Visible="_showCreateDialog" Options="_dialogOptions">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.AddBusiness" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Nuovo Tenant</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_createForm.TenantId" Label="TenantId *"
+                              Variant="Variant.Outlined" FullWidth="true"
+                              HelperText="es. tenant002" Immediate="true"
+                              Error="@(!string.IsNullOrEmpty(_createForm.TenantIdError))"
+                              ErrorText="@_createForm.TenantIdError" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_createForm.Subdomain"
+                              Label="Subdomain *"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              HelperText="es. cliente2.localhost oppure cliente2.miodominio.com"
+                              Immediate="true"
+                              Error="@(!string.IsNullOrEmpty(_createForm.SubdomainError))"
+                              ErrorText="@_createForm.SubdomainError" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_createForm.Name" Label="Nome Azienda *"
+                              Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_createForm.ConnectionString" Label="Connection String *"
+                              Variant="Variant.Outlined" FullWidth="true"
+                              HelperText="es. Data Source=tenant002.sqlite"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Storage" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="string" @bind-Value="_createForm.Region" Label="Region"
+                           Variant="Variant.Outlined" FullWidth="true">
+                    <MudSelectItem Value="@("eu-west")">🇪🇺 EU West</MudSelectItem>
+                    <MudSelectItem Value="@("eu-south")">🇮🇹 EU South</MudSelectItem>
+                    <MudSelectItem Value="@("us-east")">🇺🇸 US East</MudSelectItem>
+                    <MudSelectItem Value="@("us-west")">🇺🇸 US West</MudSelectItem>
+                    <MudSelectItem Value="@("ap-south")">🌏 AP South</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-2">Feature iniziali</MudText>
+                <div class="d-flex flex-column gap-1">
+                    @foreach (var f in _createForm.Features)
+                    {
+                        <MudCheckBox @bind-Value="f.Enabled" Label="@f.Key"
+                                     Color="Color.Primary" Size="Size.Small" />
+                    }
+                </div>
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showCreateDialog = false" Variant="Variant.Text">Annulla</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="CreateTenant" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Crea Tenant
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<!-- Dialog Modifica -->
+<MudDialog @bind-Visible="_showEditDialog" Options="_dialogOptions">
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Modifica — @_editingTenant?.Name</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudGrid>
+            <MudItem xs="12">
+                <MudTextField Value="@_editingTenant?.TenantId" Label="TenantId"
+                              Variant="Variant.Outlined" FullWidth="true"
+                              ReadOnly="true" HelperText="Non modificabile" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_editForm.Subdomain"
+                              Label="Subdomain"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              HelperText="es. cliente2.localhost oppure cliente2.miodominio.com" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_editForm.Name" Label="Nome Azienda *"
+                              Variant="Variant.Outlined" FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudSwitch T="bool" @bind-Value="_editForm.IsActive"
+                           Label="@(_editForm.IsActive ? "Tenant Attivo" : "Tenant Inattivo")"
+                           Color="Color.Success" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _showEditDialog = false" Variant="Variant.Text">Annulla</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="SaveEdit" Disabled="_saving">
+            @if (_saving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Salva
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<TenantDto> _tenants = new();
+    private StatsDto? _stats;
+    private bool _loading = true;
+    private string _searchText = "";
+    private bool _showCreateDialog = false;
+    private bool _showEditDialog = false;
+    private bool _saving = false;
+    private TenantDto? _editingTenant;
+    private CreateForm _createForm = new();
+    private EditForm _editForm = new();
+    private class EditForm
+    {
+        public string Name { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+        public string Subdomain { get; set; } = "";
+    }
+
+    private DialogOptions _dialogOptions = new()
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+    private readonly System.Text.Json.JsonSerializerOptions _jsonOpts = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+    protected override async Task OnPageInitializedAsync()
+    {
+        await LoadTenants();
+        _stats = await ApiClient.GetClient()
+            .GetFromJsonAsync<StatsDto>("api/admin/stats", _jsonOpts);
+    }
+
+    private async Task LoadTenants()
+    {
+        _loading = true;
+        try
+        {
+            _tenants = await ApiClient.GetClient()
+                .GetFromJsonAsync<List<TenantDto>>("api/admin/tenants", _jsonOpts) ?? new();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Errore: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void OpenCreateDialog()
+    {
+        _createForm = new CreateForm();
+        _showCreateDialog = true;
+    }
+
+    private void OpenEditDialog(TenantDto tenant)
+    {
+        _editingTenant = tenant;
+        _editForm = new EditForm
+            {
+                Name = tenant.Name,
+                IsActive = tenant.IsActive,
+                Subdomain = tenant.Subdomain
+            };
+        _showEditDialog = true;
+    }
+
+    private async Task CreateTenant()
+    {
+        _createForm.TenantIdError = string.IsNullOrWhiteSpace(_createForm.TenantId) ? "Campo obbligatorio" : "";
+        _createForm.SubdomainError = string.IsNullOrWhiteSpace(_createForm.Subdomain) ? "Campo obbligatorio" : "";
+
+        if (!string.IsNullOrEmpty(_createForm.TenantIdError) ||
+            !string.IsNullOrEmpty(_createForm.SubdomainError) ||
+            string.IsNullOrWhiteSpace(_createForm.Name) ||
+            string.IsNullOrWhiteSpace(_createForm.ConnectionString))
+        {
+            Snackbar.Add("Compila tutti i campi obbligatori.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var response = await ApiClient.GetClient()
+                .PostAsJsonAsync("api/admin/tenants", new
+                {
+                    tenantId = _createForm.TenantId,
+                    subdomain = _createForm.Subdomain,
+                    name = _createForm.Name,
+                    connectionString = _createForm.ConnectionString,
+                    region = _createForm.Region
+                });
+
+            if (response.IsSuccessStatusCode)
+            {
+                _showCreateDialog = false;
+                await LoadTenants();
+                Snackbar.Add($"Tenant '{_createForm.Name}' creato!", Severity.Success);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Errore: {error}", Severity.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SaveEdit()
+    {
+        if (_editingTenant is null) return;
+        _saving = true;
+        try
+        {
+            var response = await ApiClient.GetClient()
+                         .PutAsJsonAsync($"api/admin/tenants/{_editingTenant.TenantId}",
+                             new
+                             {
+                                 name = _editForm.Name,
+                                 isActive = _editForm.IsActive,
+                                 subdomain = _editForm.Subdomain
+                             });
+
+            if (response.IsSuccessStatusCode)
+            {
+                _showEditDialog = false;
+                await LoadTenants();
+                Snackbar.Add("Tenant aggiornato!", Severity.Success);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ToggleActive(TenantDto tenant)
+    {
+        var response = await ApiClient.GetClient()
+            .PutAsJsonAsync($"api/admin/tenants/{tenant.TenantId}",
+                new { name = tenant.Name, isActive = !tenant.IsActive });
+
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadTenants();
+            Snackbar.Add($"Tenant '{tenant.Name}' {(tenant.IsActive ? "disattivato" : "attivato")}!", Severity.Success);
+        }
+    }
+
+    private bool FilterFunc(TenantDto t) =>
+        string.IsNullOrEmpty(_searchText) ||
+        t.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+        t.TenantId.Contains(_searchText, StringComparison.OrdinalIgnoreCase) ||
+        t.Subdomain.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
+
+    private record TenantDto(int Id, string TenantId, string Subdomain,
+        string Name, bool IsActive, DateTime CreatedAt,
+        int ConnectionsCount, List<FeatureDto> Features);
+
+    private record FeatureDto(string FeatureKey, bool IsEnabled, string? Config);
+
+    private record StatsDto(int TotalTenants, int ActiveTenants,
+        int InactiveTenants, int EnabledFeatures,
+        int TotalMigrations, int FailedMigrations);
+
+    private class CreateForm
+    {
+        public string TenantId { get; set; } = "";
+        public string TenantIdError { get; set; } = "";
+        public string Subdomain { get; set; } = "";
+        public string SubdomainError { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string ConnectionString { get; set; } = "";
+        public string Region { get; set; } = "eu-west";
+        public List<FeatureToggle> Features { get; set; } = new()
+        {
+            new("social:feed", true),
+            new("social:chat", true),
+            new("social:notifications", true)
+        };
+    }
+
+    private class FeatureToggle
+    {
+        public string Key { get; set; }
+        public bool Enabled { get; set; }
+        public FeatureToggle(string key, bool enabled) { Key = key; Enabled = enabled; }
+    }
+}

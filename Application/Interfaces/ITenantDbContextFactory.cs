@@ -9,6 +9,7 @@ namespace Domain.Interfaces
 {
     public interface ITenantDbContextFactory
     {
-        DbContext Create();
+        //DbContext Create();
+        Microsoft.EntityFrameworkCore.DbContext Create();
     }
 }

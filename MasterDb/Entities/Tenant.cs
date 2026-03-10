@@ -11,9 +11,12 @@ namespace MasterDb.Entities
         public int Id { get; set; }
         public string TenantId { get; set; } = string.Empty;
         public string Subdomain { get; set; } = string.Empty;
-        public string Name {  get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-            
+
+        public ICollection<TenantConnection> Connections { get; set; } = new List<TenantConnection>();
+        public ICollection<TenantFeature> Features { get; set; } = new List<TenantFeature>();
+        public ICollection<TenantMigrationLog> MigrationLogs { get; set; } = new List<TenantMigrationLog>();
     }
 }

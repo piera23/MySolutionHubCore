@@ -1,6 +1,9 @@
 ﻿using Api.Seed;
+using Domain.Interfaces;
 using Infrastructure;
 using MasterDb;
+using MasterDb.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -89,21 +92,16 @@ if (app.Environment.IsDevelopment())
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
-    var masterDb = scope.ServiceProvider
-        .GetRequiredService<MasterDb.Persistence.MasterDbContext>();
-    var encryption = scope.ServiceProvider
-        .GetRequiredService<Domain.Interfaces.ITenantEncryption>();
+    var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
 
-    // 1. Seed Master DB
+    // Applica migration MasterDb prima del seed
+    await masterDb.Database.MigrateAsync();
+
+    var encryption = scope.ServiceProvider.GetRequiredService<ITenantEncryption>();
     await MasterDbSeeder.SeedAsync(masterDb, encryption);
 
-    // 2. Crea e migra i DB di ogni tenant attivo
-    var tenants = await masterDb.TenantConnections.ToListAsync();
-    foreach (var conn in tenants)
-    {
-        var connString = encryption.Decrypt(conn.ConnectionStringEncrypted);
-        await TenantDbSeeder.SeedAsync(connString);
-    }
+    // Seed tenant DB con la connection string diretta
+    await TenantDbSeeder.SeedAsync("Data Source=tenant001.sqlite");
 }
 
 app.UseHttpsRedirection();

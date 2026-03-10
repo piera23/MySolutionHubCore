@@ -1,0 +1,322 @@
+﻿@page "/register"
+@rendermode InteractiveServer
+@using MudBlazor
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Registrazione</PageTitle>
+
+<div style="min-height:100vh;background:linear-gradient(135deg,#1e3a5f 0%,#2563EB 100%);display:flex;align-items:center;justify-content:center;padding:16px">
+    <MudPaper Elevation="4" Class="pa-8 rounded-xl" Style="width:100%;max-width:480px">
+
+        <!-- Logo / Titolo -->
+        <div class="text-center mb-6">
+            <MudIcon Icon="@Icons.Material.Filled.Hub"
+                     Style="font-size:3rem;color:#2563EB" />
+            <MudText Typo="Typo.h5" Style="font-weight:700;margin-top:8px">
+                Crea il tuo account
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                @_tenantName
+            </MudText>
+        </div>
+
+        <!-- Form -->
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.FirstName"
+                              Label="Nome"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Person" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="_form.LastName"
+                              Label="Cognome"
+                              Variant="Variant.Outlined"
+                              FullWidth="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Username"
+                              Label="Username *"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.AlternateEmail"
+                              Error="@(!string.IsNullOrEmpty(_errors.Username))"
+                              ErrorText="@_errors.Username"
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Email"
+                              Label="Email *"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              InputType="InputType.Email"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Email"
+                              Error="@(!string.IsNullOrEmpty(_errors.Email))"
+                              ErrorText="@_errors.Email"
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.Password"
+                              Label="Password *"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="() => _showPassword = !_showPassword"
+                              Error="@(!string.IsNullOrEmpty(_errors.Password))"
+                              ErrorText="@_errors.Password"
+                              HelperText="Minimo 8 caratteri, una maiuscola, un numero"
+                              Immediate="true" />
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="_form.ConfirmPassword"
+                              Label="Conferma Password *"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              InputType="@(_showConfirm ? InputType.Text : InputType.Password)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_showConfirm ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="() => _showConfirm = !_showConfirm"
+                              Error="@(!string.IsNullOrEmpty(_errors.ConfirmPassword))"
+                              ErrorText="@_errors.ConfirmPassword"
+                              Immediate="true" />
+            </MudItem>
+        </MudGrid>
+
+        <!-- Password strength indicator -->
+        @if (!string.IsNullOrEmpty(_form.Password))
+        {
+            <div class="mt-3 mb-1">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Forza password:
+                    <span style="color:@_strengthColor;font-weight:600">
+                        @_strengthLabel
+                    </span>
+                </MudText>
+                <MudProgressLinear Value="@_strengthValue"
+                                   Color="@_strengthMudColor"
+                                   Size="Size.Small"
+                                   Class="mt-1 rounded" />
+            </div>
+        }
+
+        <!-- Bottone registrazione -->
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   FullWidth="true"
+                   Size="Size.Large"
+                   Class="mt-4"
+                   OnClick="Register"
+                   Disabled="_loading"
+                   Style="font-weight:700;height:48px">
+            @if (_loading)
+            {
+                <MudProgressCircular Size="Size.Small"
+                                     Indeterminate="true" Class="mr-2" />
+                <span>Registrazione in corso...</span>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+                <span>Crea Account</span>
+            }
+        </MudButton>
+
+        <MudDivider Class="my-4" />
+
+        <div class="text-center">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Hai già un account?
+                <MudLink Href="/login" Color="Color.Primary" Style="font-weight:600">
+                    Accedi
+                </MudLink>
+            </MudText>
+        </div>
+
+    </MudPaper>
+</div>
+
+@code {
+    private RegisterForm _form = new();
+    private FormErrors _errors = new();
+    private bool _loading = false;
+    private bool _showPassword = false;
+    private bool _showConfirm = false;
+    private string _tenantName = "";
+    private string _tenantSubdomain = "";
+
+    // Password strength
+    private double _strengthValue = 0;
+    private string _strengthLabel = "";
+    private string _strengthColor = "";
+    private Color _strengthMudColor = Color.Error;
+
+    private readonly System.Text.Json.JsonSerializerOptions _jsonOpts = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+    protected override void OnInitialized()
+    {
+        // Estrai subdomain dall'URL
+        var host = new Uri(Nav.Uri).Host;
+        _tenantSubdomain = host.Contains('.')
+            ? host.Split('.')[0]
+            : host;
+
+        _tenantName = $"Tenant: {_tenantSubdomain}";
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(_form.Password))
+            EvaluateStrength(_form.Password);
+    }
+
+    private void EvaluateStrength(string password)
+    {
+        var score = 0;
+        if (password.Length >= 8) score++;
+        if (password.Length >= 12) score++;
+        if (password.Any(char.IsUpper)) score++;
+        if (password.Any(char.IsDigit)) score++;
+        if (password.Any(c => !char.IsLetterOrDigit(c))) score++;
+
+        (_strengthValue, _strengthLabel, _strengthColor, _strengthMudColor) = score switch
+        {
+            <= 1 => (20, "Molto debole", "#EF4444", Color.Error),
+            2 => (40, "Debole", "#F97316", Color.Warning),
+            3 => (60, "Discreta", "#EAB308", Color.Warning),
+            4 => (80, "Buona", "#22C55E", Color.Success),
+            _ => (100, "Eccellente", "#16A34A", Color.Success)
+        };
+    }
+
+    private bool Validate()
+    {
+        _errors = new FormErrors();
+        var valid = true;
+
+        if (string.IsNullOrWhiteSpace(_form.Username))
+        {
+            _errors.Username = "Username obbligatorio";
+            valid = false;
+        }
+        else if (_form.Username.Length < 3)
+        {
+            _errors.Username = "Minimo 3 caratteri";
+            valid = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_form.Email))
+        {
+            _errors.Email = "Email obbligatoria";
+            valid = false;
+        }
+        else if (!_form.Email.Contains('@'))
+        {
+            _errors.Email = "Email non valida";
+            valid = false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_form.Password))
+        {
+            _errors.Password = "Password obbligatoria";
+            valid = false;
+        }
+        else if (_form.Password.Length < 8)
+        {
+            _errors.Password = "Minimo 8 caratteri";
+            valid = false;
+        }
+
+        if (_form.Password != _form.ConfirmPassword)
+        {
+            _errors.ConfirmPassword = "Le password non coincidono";
+            valid = false;
+        }
+
+        return valid;
+    }
+
+    private async Task Register()
+    {
+        if (!Validate()) return;
+
+        _loading = true;
+        try
+        {
+            var http = new System.Net.Http.HttpClient();
+            http.BaseAddress = new Uri("http://localhost:5000");
+            http.DefaultRequestHeaders.Add("X-Tenant-Id", _tenantSubdomain);
+
+            var response = await http.PostAsJsonAsync("api/auth/register", new
+            {
+                username = _form.Username,
+                email = _form.Email,
+                password = _form.Password,
+                firstName = _form.FirstName,
+                lastName = _form.LastName
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Snackbar.Add("Account creato con successo! Ora puoi accedere.", Severity.Success);
+                Nav.NavigateTo("/login");
+            }
+            else
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                try
+                {
+                    // Prova a leggere errori di Identity (es. username già in uso)
+                    var errors = System.Text.Json.JsonSerializer
+                        .Deserialize<List<IdentityErrorDto>>(content, _jsonOpts);
+
+                    if (errors?.Any() == true)
+                        Snackbar.Add(errors.First().Description, Severity.Error);
+                    else
+                        Snackbar.Add("Errore durante la registrazione.", Severity.Error);
+                }
+                catch
+                {
+                    Snackbar.Add(content, Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Errore di connessione: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private class RegisterForm
+    {
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
+        public string Username { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string ConfirmPassword { get; set; } = "";
+    }
+
+    private class FormErrors
+    {
+        public string Username { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+        public string ConfirmPassword { get; set; } = "";
+    }
+
+    private record IdentityErrorDto(string Code, string Description);
+}

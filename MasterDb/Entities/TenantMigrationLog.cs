@@ -9,19 +9,17 @@ namespace MasterDb.Entities
     public class TenantMigrationLog
     {
         public int Id { get; set; }
-        public int TenantId { get; set; }
-        public Tenant Tenant { get; set; } = null!;
-
+        public string TenantId { get; set; } = string.Empty;
         public string MigrationId { get; set; } = string.Empty;
-        public DateTime AppliedAt { get; set; } = DateTime.UtcNow;
+        public DateTime AppliedAt { get; set; }
         public MigrationStatus Status { get; set; }
         public string? ErrorMessage { get; set; }
     }
 
     public enum MigrationStatus
     {
-        Success = 0,
-        Failed = 1,
-        Pending = 2
+        Pending = 0,
+        Completed = 1,
+        Failed = 2
     }
 }

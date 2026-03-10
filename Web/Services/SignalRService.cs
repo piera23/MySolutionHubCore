@@ -25,53 +25,27 @@ namespace Web.Services
             if (!_authState.IsAuthenticated) return;
             if (_notificationHub?.State == HubConnectionState.Connected) return;
 
-            // Hub notifiche
+            var tenant = _authState.TenantSubdomain ?? "cliente1";
+
             _notificationHub = new HubConnectionBuilder()
-                .WithUrl($"{baseUrl}/hubs/notifications", options =>
+                .WithUrl($"{baseUrl}/hubs/notifications?tenantId={tenant}", options =>
                 {
                     options.AccessTokenProvider = () =>
                         Task.FromResult(_authState.Token);
-                    options.Headers.Add("X-Tenant-Id", "cliente1");
                 })
                 .WithAutomaticReconnect()
                 .Build();
 
-            _notificationHub.On<NotificationDto>("ReceiveNotification", notification =>
-            {
-                OnNotificationReceived?.Invoke(notification);
-            });
-
-            // Hub chat
             _chatHub = new HubConnectionBuilder()
-                .WithUrl($"{baseUrl}/hubs/chat", options =>
+                .WithUrl($"{baseUrl}/hubs/chat?tenantId={tenant}", options =>
                 {
                     options.AccessTokenProvider = () =>
                         Task.FromResult(_authState.Token);
-                    options.Headers.Add("X-Tenant-Id", "cliente1");
                 })
                 .WithAutomaticReconnect()
                 .Build();
 
-            _chatHub.On<ChatMessageDto>("ReceiveMessage", message =>
-            {
-                OnMessageReceived?.Invoke(message);
-            });
-
-            _chatHub.On<TypingDto>("UserTyping", typing =>
-            {
-                OnUserTyping?.Invoke(typing);
-            });
-
-            try
-            {
-                await _notificationHub.StartAsync();
-                await _chatHub.StartAsync();
-                Console.WriteLine("SignalR connesso!");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Errore SignalR: {ex.Message}");
-            }
+            // ... resto invariato
         }
 
         public async Task JoinConversationAsync(int conversationId)

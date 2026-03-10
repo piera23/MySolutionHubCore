@@ -33,24 +33,18 @@ namespace Infrastructure.MultiTenant
         }
 
         public async Task<ITenantContext?> ResolveAsync(
-            string subdomain,
-            CancellationToken ct = default)
+    string subdomain,
+    CancellationToken ct = default)
         {
             var cacheKey = $"tenant:{subdomain}";
 
-            // 1. Prova la cache prima
             if (_cache.TryGetValue(cacheKey, out TenantCacheEntry? cached) && cached is not null)
                 return BuildContext(cached);
 
-            // 2. Cerca nel Master DB
+            // Cerca per subdomain
             var tenant = await _masterDb.Tenants
                 .Where(t => t.Subdomain == subdomain && t.IsActive)
-                .Select(t => new
-                {
-                    t.TenantId,
-                    t.Name,
-                    Connection = t.Id,
-                })
+                .Select(t => new { t.TenantId, t.Name })
                 .FirstOrDefaultAsync(ct);
 
             if (tenant is null)
@@ -59,8 +53,9 @@ namespace Infrastructure.MultiTenant
                 return null;
             }
 
+            // Usa TenantId (stringa) per cercare la connessione
             var connection = await _masterDb.TenantConnections
-                .Where(c => c.TenantId == tenant.Connection)
+                .Where(c => c.TenantId == tenant.TenantId)
                 .FirstOrDefaultAsync(ct);
 
             if (connection is null)
@@ -70,11 +65,10 @@ namespace Infrastructure.MultiTenant
             }
 
             var features = await _masterDb.TenantFeatures
-                .Where(f => f.TenantId == tenant.Connection && f.IsEnabled)
+                .Where(f => f.TenantId == tenant.TenantId && f.IsEnabled)
                 .Select(f => f.FeatureKey)
                 .ToListAsync(ct);
 
-            // 3. Costruisci e metti in cache
             var entry = new TenantCacheEntry
             {
                 TenantId = tenant.TenantId,
@@ -84,7 +78,6 @@ namespace Infrastructure.MultiTenant
             };
 
             _cache.Set(cacheKey, entry, CacheTtl);
-
             return BuildContext(entry);
         }
 
