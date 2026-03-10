@@ -11,12 +11,13 @@ namespace Infrastructure.Identity
     {
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
-        public UserType UserType { get; set; }
+        public UserType UserType { get; set; } = UserType.External;
         public string? AvatarUrl { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool IsDeleted { get; set; } = false;
         public DateTime? LastLoginAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public bool IsDeleted { get; set; } = false;
+        public DateTime? UpdatedAt { get; set; }
     }
 
     public enum UserType

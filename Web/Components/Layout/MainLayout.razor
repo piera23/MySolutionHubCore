@@ -1,25 +1,29 @@
 ﻿@inherits LayoutComponentBase
 @using MudBlazor
+@using Web.Services
+@inject AuthStateService AuthState
+@inject SignalRService SignalR
+@inject NavigationManager Nav
 
 <MudThemeProvider Theme="_theme" />
+<MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <MudLayout>
-    <!-- Header -->
-    <MudAppBar Elevation="1" Color="Color.Surface" Dense="true">
+    <MudAppBar Elevation="2" Color="Color.Surface" Dense="true">
         <MudIconButton Icon="@Icons.Material.Filled.Menu"
                        Color="Color.Inherit"
                        Edge="Edge.Start"
                        OnClick="ToggleDrawer" />
 
-        <MudText Typo="Typo.h6" Class="ml-3" Style="font-weight:700;color:var(--mud-palette-primary)">
+        <MudText Typo="Typo.h6" Class="ml-3"
+                 Style="font-weight:700;color:var(--mud-palette-primary)">
             MySolutionHub
         </MudText>
 
         <MudSpacer />
 
-        <!-- Barra di ricerca -->
         <MudTextField @bind-Value="_searchText"
                       Placeholder="Cerca..."
                       Adornment="Adornment.Start"
@@ -31,20 +35,29 @@
 
         <MudSpacer />
 
-        <!-- Badge notifiche -->
+        <!-- Badge notifiche real-time -->
         <MudBadge Content="_unreadCount" Overlap="true" Color="Color.Error"
                   Visible="_unreadCount > 0">
             <MudIconButton Icon="@Icons.Material.Filled.Notifications"
-                           Color="Color.Inherit" />
+                           Color="Color.Inherit"
+                           OnClick="GoToNotifications" />
         </MudBadge>
 
-        <!-- Avatar utente -->
-        <MudAvatar Color="Color.Primary" Class="ml-2" Style="cursor:pointer">
+        <!-- Indicatore connessione SignalR -->
+        <MudTooltip Text="@(SignalR.IsConnected ? "Connesso" : "Disconnesso")">
+            <MudIcon Icon="@Icons.Material.Filled.Circle"
+                     Size="Size.Small"
+                     Color="@(SignalR.IsConnected ? Color.Success : Color.Error)"
+                     Class="mx-2" />
+        </MudTooltip>
+
+        <MudAvatar Color="Color.Primary" Class="ml-2"
+                   Style="cursor:pointer"
+                   @onclick="GoToProfile">
             @_userInitial
         </MudAvatar>
     </MudAppBar>
 
-    <!-- Sidebar sinistra -->
     <MudDrawer @bind-Open="_drawerOpen"
                Elevation="1"
                Variant="DrawerVariant.Responsive"
@@ -53,18 +66,21 @@
             <MudText Typo="Typo.subtitle1" Style="font-weight:600">Menu</MudText>
         </MudDrawerHeader>
         <NavMenu />
+        <MudDivider Class="my-2" />
+        <MudNavMenu>
+            <MudNavLink Icon="@Icons.Material.Filled.Logout"
+                        OnClick="Logout">
+                Esci
+            </MudNavLink>
+        </MudNavMenu>
     </MudDrawer>
 
-    <!-- Contenuto principale -->
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4">
             <MudGrid>
-                <!-- Colonna centrale — feed/contenuto -->
                 <MudItem xs="12" sm="12" md="8" lg="8">
                     @Body
                 </MudItem>
-
-                <!-- Sidebar destra — utenti online / suggerimenti -->
                 <MudItem xs="12" sm="12" md="4" lg="4" Class="d-none d-md-flex">
                     <RightSidebar />
                 </MudItem>
@@ -80,17 +96,59 @@
     private string _userInitial = "U";
 
     private MudTheme _theme = new MudTheme
-    {
-        PaletteLight = new PaletteLight
         {
-            Primary = "#2563EB",
-            Secondary = "#7C3AED",
-            AppbarBackground = "#FFFFFF",
-            Background = "#F1F5F9",
-            Surface = "#FFFFFF",
-            DrawerBackground = "#FFFFFF",
+            PaletteLight = new PaletteLight
+            {
+                Primary = "#2563EB",
+                Secondary = "#7C3AED",
+                AppbarBackground = "#FFFFFF",
+                Background = "#F1F5F9",
+                Surface = "#FFFFFF",
+                DrawerBackground = "#FFFFFF",
+            }
+        };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await AuthState.InitializeAsync();
+
+            if (AuthState.IsAuthenticated)
+            {
+                _userInitial = AuthState.Username?[0].ToString().ToUpper() ?? "U";
+
+                // Avvia SignalR
+                await SignalR.StartAsync();
+
+                // Ascolta notifiche in arrivo
+                SignalR.OnNotificationReceived += OnNotificationReceived;
+
+                StateHasChanged();
+            }
         }
-    };
+    }
+
+    private void OnNotificationReceived(SignalRService.NotificationDto notification)
+    {
+        _unreadCount++;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void GoToNotifications()
+    {
+        _unreadCount = 0;
+        Nav.NavigateTo("/notifications");
+    }
+
+    private void GoToProfile() => Nav.NavigateTo("/profile");
+
+    private async Task Logout()
+    {
+        SignalR.OnNotificationReceived -= OnNotificationReceived;
+        await AuthState.LogoutAsync();
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 }

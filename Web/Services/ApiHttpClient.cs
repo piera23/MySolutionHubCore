@@ -11,10 +11,11 @@
             _authState = authState;
         }
 
-        public HttpClient GetClient()
+        public HttpClient GetClient(string tenantSubdomain = "cliente1")
         {
-            Console.WriteLine($"IsAuthenticated: {_authState.IsAuthenticated}");
-            Console.WriteLine($"Token null: {_authState.Token is null}");
+            // Tenant header — necessario perché il server non risolve cliente1.localhost
+            _http.DefaultRequestHeaders.Remove("X-Tenant-Id");
+            _http.DefaultRequestHeaders.Add("X-Tenant-Id", tenantSubdomain);
 
             if (_authState.IsAuthenticated)
             {
@@ -26,6 +27,9 @@
             {
                 _http.DefaultRequestHeaders.Authorization = null;
             }
+
+            Console.WriteLine($"IsAuthenticated: {_authState.IsAuthenticated}");
+            Console.WriteLine($"Token null: {_authState.Token is null}");
 
             return _http;
         }

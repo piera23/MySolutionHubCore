@@ -18,6 +18,7 @@ namespace Domain.Interfaces
         Task FollowAsync(int followerId, int followedId, CancellationToken ct = default);
         Task UnfollowAsync(int followerId, int followedId, CancellationToken ct = default);
         Task ReactAsync(int eventId, int userId, string reactionType = "like", CancellationToken ct = default);
+
     }
 
     public record ActivityEventDto(

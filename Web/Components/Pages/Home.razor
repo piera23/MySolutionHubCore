@@ -86,7 +86,7 @@ else
                     </MudChip>
                     @if (!string.IsNullOrEmpty(item.Payload))
                     {
-                        <MudText Typo="Typo.body2">@item.Payload</MudText>
+                        <MudText Typo="Typo.body2">@ExtractText(item.Payload)</MudText>
                     }
                     <div class="d-flex align-center gap-3 mt-2">
                         <MudButton StartIcon="@(item.HasReacted ? Icons.Material.Filled.Favorite : Icons.Material.Outlined.FavoriteBorder)"
@@ -139,22 +139,38 @@ else
         _publishing = true;
         try
         {
-            var response = await ApiClient.GetClient().PostAsJsonAsync("api/feed/publish", new
-            {
-                eventType = "user.post",
-                payload = _newActivity
-            });
+            var response = await ApiClient.GetClient()
+                .PostAsJsonAsync("api/feed/publish", new
+                {
+                    eventType = "user.post",
+                    payload = _newActivity
+                });
+
+            var content = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Publish status: {response.StatusCode}");
+            Console.WriteLine($"Publish response: {content}");
 
             if (response.IsSuccessStatusCode)
             {
                 _newActivity = "";
                 await LoadFeed();
+                Console.WriteLine($"Feed items dopo publish: {_feedItems.Count}");
                 Snackbar.Add("Attività pubblicata!", Severity.Success);
             }
+            else
+            {
+                Snackbar.Add($"Errore: {response.StatusCode} — {content}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Eccezione publish: {ex.Message}");
+            Snackbar.Add($"Errore: {ex.Message}", Severity.Error);
         }
         finally
         {
             _publishing = false;
+            StateHasChanged();
         }
     }
 
@@ -173,6 +189,18 @@ else
         return $"{(int)diff.TotalDays}g fa";
     }
 
+    private string ExtractText(string? payload)
+    {
+        if (string.IsNullOrEmpty(payload)) return "";
+        try
+        {
+            var doc = System.Text.Json.JsonDocument.Parse(payload);
+            if (doc.RootElement.TryGetProperty("text", out var text))
+                return text.GetString() ?? payload;
+        }
+        catch { }
+        return payload;
+    }
     private record ActivityEventDto(int Id, int UserId, string Username,
         string? AvatarUrl, string EventType, string? EntityId,
         string? EntityType, string? Payload, int ReactionsCount,

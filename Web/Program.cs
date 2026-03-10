@@ -10,31 +10,20 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddMudServices();
-builder.Services.AddHttpClient<ApiHttpClient>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"]
-        ?? "http://localhost:5000");
-});
-builder.Services.AddScoped<Web.Services.AuthStateService>();
-builder.Services.AddScoped<Web.Services.ApiHttpClient>(sp =>
-{
-    var authState = sp.GetRequiredService<Web.Services.AuthStateService>();
-    var http = new HttpClient
-    {
-        BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"]
-            ?? "http://cliente1.localhost:5000")
-    };
-    return new Web.Services.ApiHttpClient(http, authState);
-});
 builder.Services.AddMasterDb(builder.Configuration, builder.Environment);
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// HttpClient per chiamare le API
-builder.Services.AddScoped(sp => new HttpClient
+builder.Services.AddScoped<AuthStateService>();
+builder.Services.AddScoped<ApiHttpClient>(sp =>
 {
-    BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"]
-        ?? "http://localhost:5000")
+    var authState = sp.GetRequiredService<AuthStateService>();
+    var http = new HttpClient
+    {
+        BaseAddress = new Uri("http://localhost:5000")
+    };
+    return new ApiHttpClient(http, authState);
 });
+builder.Services.AddScoped<Web.Services.SignalRService>();
 
 var app = builder.Build();
 
@@ -44,7 +33,6 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 app.UseMultiTenant();

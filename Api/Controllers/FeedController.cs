@@ -54,5 +54,18 @@ namespace Api.Controllers
             var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             return int.TryParse(claim, out var id) ? id : 0;
         }
+
+        [HttpPost("publish")]
+        public async Task<IActionResult> Publish([FromBody] PublishRequest request)
+        {
+            var userId = GetUserId();
+            await _activityService.PublishAsync(
+                userId,
+                request.EventType,
+                payload: new { text = request.Payload });
+            return NoContent();
+        }
+
+        public record PublishRequest(string EventType, string? Payload);
     }
 }

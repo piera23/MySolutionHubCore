@@ -15,43 +15,52 @@ namespace Infrastructure.MultiTenant
         private readonly RequestDelegate _next;
         private readonly ILogger<TenantResolutionMiddleware> _logger;
 
-        public TenantResolutionMiddleware(
-            RequestDelegate next,
+        public TenantResolutionMiddleware(RequestDelegate next,
             ILogger<TenantResolutionMiddleware> logger)
         {
             _next = next;
             _logger = logger;
         }
 
-        public async Task InvokeAsync(
-            HttpContext context,
+        public async Task InvokeAsync(HttpContext context,
             ITenantResolver resolver,
-            TenantContext tenantContext)  // scoped — viene popolato qui
+            TenantContext tenantContext)
         {
-            var host = context.Request.Host.Host; // es. "cliente1.app.com"
-            var subdomain = ExtractSubdomain(host);
+            // 1. Prima prova l'header X-Tenant-Id (Swagger / server-side calls)
+            var subdomain = context.Request.Headers["X-Tenant-Id"].FirstOrDefault();
 
-            if (subdomain is not null)
+            // 2. Se non c'è header, prova a estrarre dal sottodominio
+            if (string.IsNullOrEmpty(subdomain))
             {
-                var resolved = await resolver.ResolveAsync(subdomain);
+                subdomain = ExtractSubdomain(context.Request.Host.Host);
+            }
 
-                if (resolved is not null)
+            if (!string.IsNullOrEmpty(subdomain))
+            {
+                try
                 {
-                    // Popola il TenantContext scoped per questa request
-                    tenantContext.SetTenant(
-                        resolved.TenantId,
-                        resolved.TenantName,
-                        resolved.ConnectionString,
-                        resolved.Settings.Keys,
-                        new Dictionary<string, string>(resolved.Settings));
+                    var tenant = await resolver.ResolveAsync(subdomain);
+                    if (tenant is not null)
+                    {
+                        tenantContext.SetTenant(
+                            tenant.TenantId,
+                            tenant.TenantName,
+                            tenant.ConnectionString);
+
+                        _logger.LogDebug(
+                            "Tenant risolto: {TenantId} da '{Subdomain}'",
+                            tenant.TenantId, subdomain);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Tenant non trovato per subdomain: {Subdomain}", subdomain);
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    _logger.LogWarning(
-                        "Tenant non risolto per host: {Host}", host);
-                    context.Response.StatusCode = StatusCodes.Status404NotFound;
-                    await context.Response.WriteAsync("Tenant non trovato.");
-                    return;
+                    _logger.LogError(ex,
+                        "Errore nella risoluzione del tenant: {Subdomain}", subdomain);
                 }
             }
 
@@ -60,27 +69,21 @@ namespace Infrastructure.MultiTenant
 
         private static string? ExtractSubdomain(string host)
         {
-            // Rimuovi la porta se presente (es. "cliente1.localhost:5001" → "cliente1.localhost")
-            host = host.Split(':')[0];
+            if (string.IsNullOrEmpty(host)) return null;
 
+            // localhost o 127.0.0.1 — nessun sottodominio
+            if (host == "localhost" || host == "127.0.0.1") return null;
+
+            // cliente1.localhost → "cliente1"
+            if (host.EndsWith(".localhost"))
+                return host[..host.LastIndexOf(".localhost")];
+
+            // cliente1.app.com → "cliente1"
             var parts = host.Split('.');
-
-            // Produzione: "cliente1.app.com" → "cliente1"
             if (parts.Length >= 3)
-                return parts[0];
-
-            // Sviluppo: "cliente1.localhost" → "cliente1"
-            if (parts.Length == 2 && parts[1] == "localhost")
                 return parts[0];
 
             return null;
         }
-        //private static string? ExtractSubdomain(string host)
-        //{
-        //    // "cliente1.app.com" → "cliente1"
-        //    // "localhost" → null (utile in sviluppo)
-        //    var parts = host.Split('.');
-        //    return parts.Length >= 3 ? parts[0] : null;
-        //}
     }
 }

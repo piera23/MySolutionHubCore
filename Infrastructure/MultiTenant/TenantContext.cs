@@ -24,7 +24,7 @@ namespace Infrastructure.MultiTenant
             string tenantId,
             string tenantName,
             string connectionString,
-            IEnumerable<string> enabledFeatures,
+            IEnumerable<string> enabledFeatures = null,
             Dictionary<string, string>? settings = null)
         {
             TenantId = tenantId;

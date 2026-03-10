@@ -6,6 +6,20 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Servizi ──────────────────────────────────────
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("BlazorWeb", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5001",
+                "https://localhost:5001",
+                "http://localhost:7001",
+                "https://localhost:7001")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -96,6 +110,7 @@ app.UseHttpsRedirection();
 
 // Tenant resolution PRIMA di auth e controller
 app.UseMultiTenant();       // 1. Risolvi tenant
+app.UseCors("BlazorWeb");
 app.UseAuthentication();    // 2. Chi sei?
 app.UseAuthorization();     // 3. Cosa puoi fare?
 

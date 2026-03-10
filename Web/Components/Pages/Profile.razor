@@ -1,0 +1,374 @@
+﻿@page "/profile"
+@rendermode InteractiveServer
+@using MudBlazor
+@inherits AppPageBase
+@inject ISnackbar Snackbar
+
+<PageTitle>Profilo — MySolutionHub</PageTitle>
+
+@if (!_initialized)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    return;
+}
+
+@if (!AuthState.IsAuthenticated)
+{
+    Nav.NavigateTo("/login");
+    return;
+}
+
+<MudText Typo="Typo.h6" Class="mb-4" Style="font-weight:700">
+    👤 Il mio profilo
+</MudText>
+
+<MudGrid>
+    <!-- Colonna sinistra — avatar e info base -->
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="1" Class="pa-4 rounded-lg text-center">
+
+            <!-- Avatar -->
+            <div class="d-flex justify-center mb-3">
+                @if (!string.IsNullOrEmpty(_profile?.AvatarUrl))
+                {
+                    <MudAvatar Style="width:96px;height:96px;font-size:2rem">
+                        <MudImage Src="@_profile.AvatarUrl" />
+                    </MudAvatar>
+                }
+                else
+                {
+                    <MudAvatar Color="Color.Primary"
+                               Style="width:96px;height:96px;font-size:2.5rem">
+                        @(_profile?.UserName?[0].ToString().ToUpper() ?? "U")
+                    </MudAvatar>
+                }
+            </div>
+
+            <MudText Typo="Typo.h6" Style="font-weight:700">
+                @_profile?.FirstName @_profile?.LastName
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-1">
+                @@@_profile?.UserName
+            </MudText>
+            <MudChip T="string" Size="Size.Small"
+                     Color="@(_profile?.UserType == 0 ? Color.Primary : Color.Secondary)"
+                     Variant="Variant.Outlined">
+                @(_profile?.UserType == 0 ? "Internal" : "External")
+            </MudChip>
+
+            <MudDivider Class="my-3" />
+
+            <div class="text-left">
+                <div class="d-flex align-center mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Email"
+                             Size="Size.Small" Color="Color.Secondary" Class="mr-2" />
+                    <MudText Typo="Typo.body2">@_profile?.Email</MudText>
+                </div>
+                @if (!string.IsNullOrEmpty(_profile?.PhoneNumber))
+                {
+                    <div class="d-flex align-center mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Phone"
+                                 Size="Size.Small" Color="Color.Secondary" Class="mr-2" />
+                        <MudText Typo="Typo.body2">@_profile.PhoneNumber</MudText>
+                    </div>
+                }
+                <div class="d-flex align-center mb-2">
+                    <MudIcon Icon="@Icons.Material.Filled.CalendarToday"
+                             Size="Size.Small" Color="Color.Secondary" Class="mr-2" />
+                    <MudText Typo="Typo.body2">
+                        Membro dal @_profile?.CreatedAt.ToString("dd/MM/yyyy")
+                    </MudText>
+                </div>
+                @if (_profile?.LastLoginAt is not null)
+                {
+                    <div class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.AccessTime"
+                                 Size="Size.Small" Color="Color.Secondary" Class="mr-2" />
+                        <MudText Typo="Typo.body2">
+                            Ultimo accesso @_profile.LastLoginAt.Value.ToString("dd/MM/yyyy HH:mm")
+                        </MudText>
+                    </div>
+                }
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <!-- Colonna destra — form modifica -->
+    <MudItem xs="12" md="8">
+
+        <!-- Dati personali -->
+        <MudPaper Elevation="1" Class="pa-4 rounded-lg mb-4">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:700" Class="mb-4">
+                ✏️ Modifica dati personali
+            </MudText>
+
+            <MudGrid>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_editForm.FirstName"
+                                  Label="Nome"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_editForm.LastName"
+                                  Label="Cognome"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_editForm.PhoneNumber"
+                                  Label="Telefono"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Telephone"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_editForm.AvatarUrl"
+                                  Label="URL Avatar"
+                                  Variant="Variant.Outlined"
+                                  FullWidth="true"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Image" />
+                </MudItem>
+            </MudGrid>
+            <div class="d-flex align-center mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.Lock"
+                         Size="Size.Small" Color="Color.Secondary" Class="mr-2" />
+                <MudText Typo="Typo.body2"
+                         Style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:0.7rem">
+                    @(_profile?.PasswordHash is not null
+                        ? _profile.PasswordHash[..20] + "..."
+                        : "N/A")
+                </MudText>
+            </div>
+            <div class="d-flex justify-end mt-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           OnClick="SaveProfile"
+                           Disabled="_savingProfile">
+                    @if (_savingProfile)
+                    {
+                        <MudProgressCircular Size="Size.Small"
+                                             Indeterminate="true" Class="mr-2" />
+                    }
+                    Salva modifiche
+                </MudButton>
+            </div>
+        </MudPaper>
+
+        <!-- Cambio password -->
+        <MudPaper Elevation="1" Class="pa-4 rounded-lg">
+            <MudText Typo="Typo.subtitle1" Style="font-weight:700" Class="mb-4">
+                🔒 Cambia password
+            </MudText>
+
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="_passwordForm.CurrentPassword"
+                                  Label="Password attuale"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_passwordForm.NewPassword"
+                                  Label="Nuova password"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password"
+                                  FullWidth="true" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="_passwordForm.ConfirmPassword"
+                                  Label="Conferma nuova password"
+                                  Variant="Variant.Outlined"
+                                  InputType="InputType.Password"
+                                  FullWidth="true"
+                                  Error="@_passwordMismatch"
+                                  ErrorText="Le password non coincidono" />
+                </MudItem>
+            </MudGrid>
+
+            <div class="d-flex justify-end mt-4">
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Warning"
+                           StartIcon="@Icons.Material.Filled.Lock"
+                           OnClick="ChangePassword"
+                           Disabled="_savingPassword">
+                    @if (_savingPassword)
+                    {
+                        <MudProgressCircular Size="Size.Small"
+                                             Indeterminate="true" Class="mr-2" />
+                    }
+                    Cambia password
+                </MudButton>
+            </div>
+        </MudPaper>
+
+    </MudItem>
+</MudGrid>
+
+@code {
+    private ProfileDto? _profile;
+    private EditProfileForm _editForm = new();
+    private ChangePasswordForm _passwordForm = new();
+    private bool _savingProfile = false;
+    private bool _savingPassword = false;
+    private bool _passwordMismatch = false;
+
+    protected override async Task OnPageInitializedAsync()
+    {
+        await LoadProfile();
+    }
+
+    private async Task LoadProfile()
+    {
+        try
+        {
+            var response = await ApiClient.GetClient()
+                .GetAsync("api/users/me");
+
+            var content = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Profile status: {response.StatusCode}");
+            Console.WriteLine($"Profile response: {content}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _profile = System.Text.Json.JsonSerializer.Deserialize<ProfileDto>(
+                    content,
+                    new System.Text.Json.JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+
+                if (_profile is not null)
+                {
+                    _editForm.FirstName = _profile.FirstName ?? "";
+                    _editForm.LastName = _profile.LastName ?? "";
+                    _editForm.PhoneNumber = _profile.PhoneNumber ?? "";
+                    _editForm.AvatarUrl = _profile.AvatarUrl ?? "";
+                }
+
+                Console.WriteLine($"Profile loaded: {_profile?.UserName}");
+            }
+            else
+            {
+                Snackbar.Add($"Errore: {response.StatusCode}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Eccezione profilo: {ex.Message}");
+            Snackbar.Add($"Errore caricamento profilo: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SaveProfile()
+    {
+        _savingProfile = true;
+        try
+        {
+            var response = await ApiClient.GetClient()
+                .PutAsJsonAsync("api/users/me", new
+                {
+                    firstName = _editForm.FirstName,
+                    lastName = _editForm.LastName,
+                    phoneNumber = _editForm.PhoneNumber,
+                    avatarUrl = _editForm.AvatarUrl
+                });
+
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadProfile();
+                Snackbar.Add("Profilo aggiornato con successo!", Severity.Success);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Errore: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Errore: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingProfile = false;
+        }
+    }
+
+    private async Task ChangePassword()
+    {
+        _passwordMismatch = _passwordForm.NewPassword != _passwordForm.ConfirmPassword;
+        if (_passwordMismatch) return;
+
+        if (string.IsNullOrWhiteSpace(_passwordForm.CurrentPassword) ||
+            string.IsNullOrWhiteSpace(_passwordForm.NewPassword))
+        {
+            Snackbar.Add("Compila tutti i campi password.", Severity.Warning);
+            return;
+        }
+
+        _savingPassword = true;
+        try
+        {
+            var response = await ApiClient.GetClient()
+                .PutAsJsonAsync("api/users/me/password", new
+                {
+                    currentPassword = _passwordForm.CurrentPassword,
+                    newPassword = _passwordForm.NewPassword
+                });
+
+            if (response.IsSuccessStatusCode)
+            {
+                _passwordForm = new();
+                Snackbar.Add("Password cambiata con successo!", Severity.Success);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                Snackbar.Add($"Errore: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Errore: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _savingPassword = false;
+        }
+    }
+
+    // DTOs e form models
+    private record ProfileDto(
+    int Id,
+    string UserName,
+    string Email,
+    string? FirstName,
+    string? LastName,
+    string? PhoneNumber,
+    string? AvatarUrl,
+    bool IsActive,
+    int UserType,
+    DateTime? LastLoginAt,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt,
+    string? PasswordHash);
+
+    private class EditProfileForm
+    {
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
+        public string PhoneNumber { get; set; } = "";
+        public string AvatarUrl { get; set; } = "";
+    }
+
+    private class ChangePasswordForm
+    {
+        public string CurrentPassword { get; set; } = "";
+        public string NewPassword { get; set; } = "";
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

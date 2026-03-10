@@ -1,12 +1,23 @@
 ﻿@page "/chat"
 @rendermode InteractiveServer
+@implements IDisposable
 @using MudBlazor
 @using Web.Services
 @using Microsoft.AspNetCore.Components.Web
 @inherits AppPageBase
 @inject ISnackbar Snackbar
+@inject SignalRService SignalR
 
 <PageTitle>Chat — MySolutionHub</PageTitle>
+
+@if (!string.IsNullOrEmpty(_typingUser))
+{
+    <div class="px-3 pb-1">
+        <MudText Typo="Typo.caption" Color="Color.Secondary">
+            <em>@_typingUser sta scrivendo...</em>
+        </MudText>
+    </div>
+}
 
 @if (!_initialized)
 {
@@ -134,7 +145,8 @@
                                   Variant="Variant.Outlined"
                                   Margin="Margin.Dense"
                                   FullWidth="true"
-                                  OnKeyDown="HandleKeyDown" />
+                                  OnKeyDown="HandleKeyDown"
+                                  @oninput="HandleTyping" />
                     <MudIconButton Icon="@Icons.Material.Filled.Send"
                                    Color="Color.Primary"
                                    Variant="Variant.Filled"
@@ -151,9 +163,83 @@
     private List<MessageDto> _messages = new();
     private string _newMessage = "";
 
+    private int _currentConversationId = 0;
+
     protected override async Task OnPageInitializedAsync()
     {
         await LoadConversations();
+
+        // Ascolta messaggi in arrivo
+        SignalR.OnMessageReceived += OnMessageReceived;
+        SignalR.OnUserTyping += OnUserTyping;
+    }
+
+    private void OnMessageReceived(SignalRService.ChatMessageDto msg)
+    {
+        if (msg.ConversationId == _currentConversationId)
+        {
+            _messages.Add(new MessageDto(
+                msg.Id, msg.ConversationId, msg.SenderId,
+                msg.SenderUsername, msg.SenderAvatar,
+                msg.Body, msg.SentAt, msg.IsOwn));
+
+            InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            // Aggiorna badge conversazione
+            var conv = _conversations.FirstOrDefault(c => c.Id == msg.ConversationId);
+            if (conv is not null)
+                InvokeAsync(LoadConversations);
+        }
+    }
+
+    private string _typingUser = "";
+    private void OnUserTyping(SignalRService.TypingDto typing)
+    {
+        if (typing.ConversationId == _currentConversationId)
+        {
+            _typingUser = typing.Username;
+            InvokeAsync(StateHasChanged);
+
+            // Nascondi dopo 2 secondi
+            Task.Delay(2000).ContinueWith(_ =>
+            {
+                _typingUser = "";
+                InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+
+    private async Task SelectConversation(ConversationDto conv)
+    {
+        // Lascia la conversazione precedente
+        if (_currentConversationId > 0)
+            await SignalR.LeaveConversationAsync(_currentConversationId);
+
+        _selectedConversation = conv;
+        _currentConversationId = conv.Id;
+
+        var result = await ApiClient.GetClient()
+            .GetFromJsonAsync<List<MessageDto>>(
+                $"api/chat/conversations/{conv.Id}/messages");
+        _messages = result ?? new();
+
+        await ApiClient.GetClient()
+            .PutAsync($"api/chat/conversations/{conv.Id}/read", null);
+
+        // Entra nella stanza SignalR
+        await SignalR.JoinConversationAsync(conv.Id);
+    }
+
+    // Implementa IDisposable per rimuovere i listener
+    public void Dispose()
+    {
+        SignalR.OnMessageReceived -= OnMessageReceived;
+        SignalR.OnUserTyping -= OnUserTyping;
+
+        if (_currentConversationId > 0)
+            _ = SignalR.LeaveConversationAsync(_currentConversationId);
     }
 
     private async Task LoadConversations()
@@ -163,35 +249,41 @@
         _conversations = result ?? new();
     }
 
-    private async Task SelectConversation(ConversationDto conv)
-    {
-        _selectedConversation = conv;
-        var result = await ApiClient.GetClient()
-            .GetFromJsonAsync<List<MessageDto>>(
-                $"api/chat/conversations/{conv.Id}/messages");
-        _messages = result ?? new();
-        await ApiClient.GetClient()
-            .PutAsync($"api/chat/conversations/{conv.Id}/read", null);
-    }
-
     private async Task SendMessage()
     {
         if (string.IsNullOrWhiteSpace(_newMessage) || _selectedConversation is null) return;
 
-        var response = await ApiClient.GetClient()
-            .PostAsJsonAsync(
-                $"api/chat/conversations/{_selectedConversation.Id}/messages",
-                new { body = _newMessage, attachmentUrl = (string?)null });
-
-        if (response.IsSuccessStatusCode)
+        try
         {
-            _newMessage = "";
-            await SelectConversation(_selectedConversation);
+            var response = await ApiClient.GetClient()
+                .PostAsJsonAsync(
+                    $"api/chat/conversations/{_selectedConversation.Id}/messages",
+                    new { body = _newMessage, attachmentUrl = (string?)null });
+
+            var content = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"SendMessage status: {response.StatusCode}");
+            Console.WriteLine($"SendMessage response: {content}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                _newMessage = "";
+                await SelectConversation(_selectedConversation);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Eccezione SendMessage: {ex.Message}");
         }
     }
+
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") await SendMessage();
+    }
+    private async Task HandleTyping(ChangeEventArgs e)
+    {
+        if (_currentConversationId > 0)
+            await SignalR.SendTypingAsync(_currentConversationId);
     }
 
     private record ConversationDto(int Id, string? Title, bool IsGroup,
@@ -201,5 +293,5 @@
     private record MessageDto(int Id, int ConversationId, int SenderId,
         string SenderUsername, string? SenderAvatar, string Body,
         DateTime SentAt, bool IsOwn);
-}
+
 }
