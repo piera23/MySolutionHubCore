@@ -111,14 +111,19 @@ namespace Infrastructure.Services
         }
 
         public async Task<IEnumerable<ConversationDto>> GetUserConversationsAsync(
-            int userId, CancellationToken ct = default)
+            int userId, int page = 1, int pageSize = 20, CancellationToken ct = default)
         {
+            pageSize = Math.Clamp(pageSize, 1, 50);
+            page = Math.Max(page, 1);
+
             await using var db = (BaseAppDbContext)_dbFactory.Create();
 
             var conversations = await db.ChatConversations
                 .Where(c => c.Participants.Any(p => p.UserId == userId && p.IsActive))
                 .Include(c => c.Participants)
                 .OrderByDescending(c => c.LastMessageAt ?? c.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync(ct);
 
             var result = new List<ConversationDto>();

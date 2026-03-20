@@ -20,5 +20,8 @@ namespace Application.Interfaces
 
         /// <summary>Revoca il refresh token specificato (logout).</summary>
         Task RevokeAsync(int userId, string refreshToken, CancellationToken ct = default);
+
+        /// <summary>Conferma l'email tramite il token generato da Identity.</summary>
+        Task<bool> ConfirmEmailAsync(int userId, string token, CancellationToken ct = default);
     }
 }

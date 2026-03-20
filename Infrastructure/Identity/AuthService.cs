@@ -1,9 +1,11 @@
 using Application.Features.Auth;
 using Application.Interfaces;
 using Domain.Entities;
+using Domain.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Identity
@@ -13,6 +15,8 @@ namespace Infrastructure.Identity
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IJwtService _jwtService;
         private readonly BaseAppDbContext _db;
+        private readonly IEmailService _email;
+        private readonly IConfiguration _config;
         private readonly ILogger<AuthService> _logger;
 
         // Durata del refresh token: 7 giorni
@@ -22,11 +26,15 @@ namespace Infrastructure.Identity
             UserManager<ApplicationUser> userManager,
             IJwtService jwtService,
             BaseAppDbContext db,
+            IEmailService email,
+            IConfiguration config,
             ILogger<AuthService> logger)
         {
             _userManager = userManager;
             _jwtService = jwtService;
             _db = db;
+            _email = email;
+            _config = config;
             _logger = logger;
         }
 
@@ -67,6 +75,9 @@ namespace Infrastructure.Identity
 
             var role = userType == UserType.Internal ? "Internal" : "External";
             await _userManager.AddToRoleAsync(user, role);
+
+            // Invia email di conferma
+            await SendConfirmationEmailAsync(user, ct);
 
             return await BuildAuthResponseAsync(user, ct);
         }
@@ -203,6 +214,52 @@ namespace Infrastructure.Identity
                 t.UpdatedAt = DateTime.UtcNow;
             }
             await _db.SaveChangesAsync(ct);
+        }
+
+        public async Task<bool> ConfirmEmailAsync(int userId, string token, CancellationToken ct = default)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user is null)
+            {
+                _logger.LogWarning("ConfirmEmail: utente {UserId} non trovato.", userId);
+                return false;
+            }
+
+            var result = await _userManager.ConfirmEmailAsync(user, token);
+            if (!result.Succeeded)
+            {
+                _logger.LogWarning("ConfirmEmail fallito per {UserId}: {Errors}",
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return false;
+            }
+
+            _logger.LogInformation("Email confermata per utente {UserId}.", userId);
+            return true;
+        }
+
+        private async Task SendConfirmationEmailAsync(ApplicationUser user, CancellationToken ct)
+        {
+            try
+            {
+                var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+                var encodedToken = Uri.EscapeDataString(token);
+                var baseUrl = _config["App:BaseUrl"] ?? "http://localhost:5001";
+                var link = $"{baseUrl}/confirm-email?userId={user.Id}&token={encodedToken}";
+
+                var body = $"""
+                    <p>Ciao {user.FirstName ?? user.UserName},</p>
+                    <p>Conferma il tuo account cliccando sul link:</p>
+                    <p><a href="{link}">{link}</a></p>
+                    <p>Il link è valido per 24 ore.</p>
+                    """;
+
+                await _email.SendAsync(user.Email!, "Conferma il tuo account MySolutionHub", body, ct);
+            }
+            catch (Exception ex)
+            {
+                // Non bloccare la registrazione se l'email fallisce
+                _logger.LogError(ex, "Errore invio email di conferma a {Email}.", user.Email);
+            }
         }
 
         private static string GenerateToken() => Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");

@@ -18,6 +18,7 @@ namespace MasterDb.Persistence
         public DbSet<TenantFeature> TenantFeatures => Set<TenantFeature>();
         public DbSet<TenantMigrationLog> TenantMigrationLogs => Set<TenantMigrationLog>();
         public DbSet<TenantSetting> TenantSettings => Set<TenantSetting>();
+        public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -60,6 +61,20 @@ namespace MasterDb.Persistence
                 e.HasIndex(s => new { s.TenantId, s.Key }).IsUnique();
                 e.Property(s => s.Key).HasMaxLength(200).IsRequired();
                 e.Property(s => s.Value).HasMaxLength(2000).IsRequired();
+            });
+
+            modelBuilder.Entity<AuditLog>(e =>
+            {
+                e.HasKey(a => a.Id);
+                e.HasIndex(a => a.TenantId);
+                e.HasIndex(a => a.Timestamp);
+                e.Property(a => a.Action).HasMaxLength(100).IsRequired();
+                e.Property(a => a.ActorId).HasMaxLength(100).IsRequired();
+                e.Property(a => a.ActorName).HasMaxLength(256).IsRequired();
+                e.Property(a => a.EntityType).HasMaxLength(100);
+                e.Property(a => a.EntityId).HasMaxLength(100);
+                e.Property(a => a.IpAddress).HasMaxLength(45);
+                e.Property(a => a.Changes).HasMaxLength(4000);
             });
         }
     }

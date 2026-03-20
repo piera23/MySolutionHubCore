@@ -47,6 +47,11 @@ namespace Infrastructure
                 return (BaseAppDbContext)factory.Create();
             });
 
+            // Email service (LoggingEmailService per dev; sostituire con SmtpEmailService in prod)
+            services.AddScoped<IEmailService, LoggingEmailService>();
+            // Audit
+            services.AddHttpContextAccessor();
+            services.AddScoped<IAuditService, AuditService>();
             // AuthService
             services.AddScoped<IAuthService, AuthService>();
             // Social Layer services

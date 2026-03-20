@@ -129,7 +129,7 @@
                     await AuthState.SetUserAsync(
                         result.Token, result.RefreshToken,
                         result.Username, result.Email,
-                        result.UserType, tenantSubdomain);
+                        result.UserType, result.ExpiresAt, tenantSubdomain);
 
                     Console.WriteLine($"Login OK — navigating to home");
                     _navigateToHome = true;

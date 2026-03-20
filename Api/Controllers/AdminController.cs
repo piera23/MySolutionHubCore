@@ -10,6 +10,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 
 namespace Api.Controllers
 {
@@ -23,6 +24,7 @@ namespace Api.Controllers
         private readonly ITenantProvisioningService _provisioning;
         private readonly IMemoryCache _cache;
         private readonly IHostEnvironment _env;
+        private readonly IAuditService _audit;
         private readonly ILogger<AdminController> _logger;
 
         public AdminController(
@@ -31,6 +33,7 @@ namespace Api.Controllers
             ITenantProvisioningService provisioning,
             IMemoryCache cache,
             IHostEnvironment env,
+            IAuditService audit,
             ILogger<AdminController> logger)
         {
             _masterDb = masterDb;
@@ -38,6 +41,7 @@ namespace Api.Controllers
             _provisioning = provisioning;
             _cache = cache;
             _env = env;
+            _audit = audit;
             _logger = logger;
         }
 
@@ -219,6 +223,12 @@ namespace Api.Controllers
             tenantToActivate.IsActive = true;
             await _masterDb.SaveChangesAsync();
 
+            await _audit.LogAsync("CreateTenant",
+                tenantId: request.TenantId,
+                entityType: "Tenant",
+                entityId: request.TenantId,
+                changes: JsonSerializer.Serialize(new { request.Name, request.Subdomain, request.Region }));
+
             return Ok(new
             {
                 tenantToActivate.TenantId,
@@ -286,6 +296,12 @@ namespace Api.Controllers
             if (tenant.Subdomain != oldSubdomain)
                 _cache.Remove($"tenant:{tenant.Subdomain}");
 
+            await _audit.LogAsync("UpdateTenant",
+                tenantId: tenantId,
+                entityType: "Tenant",
+                entityId: tenantId,
+                changes: JsonSerializer.Serialize(new { request.Name, request.IsActive, request.Subdomain }));
+
             return Ok(new { tenant.TenantId, tenant.Subdomain, tenant.Name, tenant.IsActive });
         }
 
@@ -326,6 +342,12 @@ namespace Api.Controllers
 
             if (subdomain is not null)
                 _cache.Remove($"tenant:{subdomain}");
+
+            await _audit.LogAsync("ToggleFeature",
+                tenantId: tenantId,
+                entityType: "TenantFeature",
+                entityId: featureKey,
+                changes: JsonSerializer.Serialize(new { IsEnabled = request.IsEnabled, request.Config }));
 
             return Ok(new { tenantId, featureKey, request.IsEnabled });
         }
@@ -368,6 +390,12 @@ namespace Api.Controllers
 
             user.IsActive = !user.IsActive;
             await db.SaveChangesAsync();
+
+            await _audit.LogAsync("ToggleUser",
+                tenantId: tenantId,
+                entityType: "User",
+                entityId: userId.ToString(),
+                changes: JsonSerializer.Serialize(new { IsActive = user.IsActive }));
 
             return Ok(new { userId, user.IsActive });
         }
@@ -424,6 +452,12 @@ namespace Api.Controllers
             if (subdomain is not null)
                 _cache.Remove($"tenant:{subdomain}");
 
+            await _audit.LogAsync("UpsertSetting",
+                tenantId: tenantId,
+                entityType: "TenantSetting",
+                entityId: key,
+                changes: JsonSerializer.Serialize(new { Value = request.Value }));
+
             return Ok(new { tenantId, key, request.Value });
         }
 
@@ -438,6 +472,11 @@ namespace Api.Controllers
             _masterDb.TenantSettings.Remove(setting);
             await _masterDb.SaveChangesAsync();
 
+            await _audit.LogAsync("DeleteSetting",
+                tenantId: tenantId,
+                entityType: "TenantSetting",
+                entityId: key);
+
             var subdomain = await _masterDb.Tenants
                 .Where(t => t.TenantId == tenantId)
                 .Select(t => t.Subdomain)
@@ -446,6 +485,31 @@ namespace Api.Controllers
                 _cache.Remove($"tenant:{subdomain}");
 
             return NoContent();
+        }
+
+        // ── Audit Log ──────────────────────────────────────────
+
+        [HttpGet("audit-logs")]
+        public async Task<IActionResult> GetAuditLogs(
+            [FromQuery] string? tenantId = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 50)
+        {
+            pageSize = Math.Clamp(pageSize, 1, 200);
+            page = Math.Max(page, 1);
+
+            var query = _masterDb.AuditLogs.AsQueryable();
+            if (!string.IsNullOrEmpty(tenantId))
+                query = query.Where(a => a.TenantId == tenantId);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(a => a.Timestamp)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return Ok(new Application.Common.PaginatedResult<object>(items, total, page, pageSize));
         }
 
         [HttpGet("tenants/{tenantId}/migrations")]

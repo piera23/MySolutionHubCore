@@ -2,6 +2,7 @@ using Application.Features.Auth;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Api.Controllers
@@ -18,6 +19,7 @@ namespace Api.Controllers
         }
 
         [HttpPost("register")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             if (!ModelState.IsValid)
@@ -31,6 +33,7 @@ namespace Api.Controllers
         }
 
         [HttpPost("login")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             if (!ModelState.IsValid)
@@ -44,6 +47,7 @@ namespace Api.Controllers
         }
 
         [HttpPost("refresh")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
         {
             if (!ModelState.IsValid)
@@ -54,6 +58,19 @@ namespace Api.Controllers
                 return Unauthorized(new { message = "Refresh token non valido o scaduto." });
 
             return Ok(result);
+        }
+
+        [HttpGet("confirm-email")]
+        public async Task<IActionResult> ConfirmEmail([FromQuery] int userId, [FromQuery] string token)
+        {
+            if (userId <= 0 || string.IsNullOrWhiteSpace(token))
+                return BadRequest(new { message = "Parametri non validi." });
+
+            var success = await _authService.ConfirmEmailAsync(userId, token);
+            if (!success)
+                return BadRequest(new { message = "Link di conferma non valido o scaduto." });
+
+            return Ok(new { message = "Email confermata con successo. Puoi ora accedere." });
         }
 
         [Authorize]

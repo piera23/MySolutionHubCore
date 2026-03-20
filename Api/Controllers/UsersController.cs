@@ -1,4 +1,6 @@
-﻿using Infrastructure.Identity;
+﻿using Application.Common;
+using Domain.Interfaces;
+using Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -15,19 +17,33 @@ namespace Api.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IJwtService _jwtService;
+        private readonly IAuditService _audit;
 
         public UsersController(
             UserManager<ApplicationUser> userManager,
-            IJwtService jwtService)
+            IJwtService jwtService,
+            IAuditService audit)
         {
             _userManager = userManager;
             _jwtService = jwtService;
+            _audit = audit;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
-            var users = await _userManager.Users
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            page = Math.Max(page, 1);
+
+            var query = _userManager.Users;
+            var total = await query.CountAsync();
+
+            var items = await query
+                .OrderBy(u => u.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(u => new
                 {
                     u.Id,
@@ -46,7 +62,7 @@ namespace Api.Controllers
                 })
                 .ToListAsync();
 
-            return Ok(users);
+            return Ok(new PaginatedResult<object>(items, total, page, pageSize));
         }
 
         [HttpGet("{id}")]
@@ -175,6 +191,11 @@ namespace Api.Controllers
 
             var roles = await _userManager.GetRolesAsync(user);
             var token = _jwtService.GenerateToken(user, roles);
+
+            await _audit.LogAsync("MakeAdmin",
+                entityType: "User",
+                entityId: id.ToString(),
+                changes: $"User '{user.UserName}' promoted to Admin");
 
             return Ok(new { user.UserName, Roles = roles, Token = token });
         }

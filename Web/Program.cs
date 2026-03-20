@@ -17,7 +17,11 @@ builder.Services.AddScoped<AuthStateService>();
 builder.Services.AddScoped<ApiHttpClient>(sp =>
 {
     var authState = sp.GetRequiredService<AuthStateService>();
-    var http = new HttpClient
+    var handler = new Web.Services.TokenRefreshHandler(authState)
+    {
+        InnerHandler = new HttpClientHandler()
+    };
+    var http = new HttpClient(handler)
     {
         BaseAddress = new Uri("http://localhost:5000")
     };

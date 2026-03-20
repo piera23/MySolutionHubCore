@@ -5,7 +5,9 @@ using Infrastructure;
 using MasterDb;
 using MasterDb.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,6 +100,30 @@ if (!builder.Environment.IsDevelopment())
     });
 }
 
+// ── Rate Limiting ─────────────────────────────────────────────────────────────
+builder.Services.AddRateLimiter(options =>
+{
+    // Auth endpoints: max 10 tentativi/minuto per IP
+    options.AddFixedWindowLimiter("auth", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 10;
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+
+    // API generica: max 200 richieste/minuto per IP
+    options.AddFixedWindowLimiter("api", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 200;
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 5;
+    });
+
+    options.RejectionStatusCode = 429;
+});
+
 builder.Services.AddHealthChecks()
     .AddCheck<Api.HealthChecks.MasterDbHealthCheck>("master-db", tags: ["ready"]);
 
@@ -141,6 +167,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 
 app.UseMultiTenant();
 app.UseCors("BlazorWeb");

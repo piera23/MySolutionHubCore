@@ -12,6 +12,7 @@ namespace Web.Services
         public string? Email { get; private set; }
         public string? UserType { get; private set; }
         public int UserId { get; private set; }
+        public DateTime TokenExpiresAt { get; private set; }
         public bool IsAuthenticated => !string.IsNullOrEmpty(Token);
         public string? TenantSubdomain { get; private set; }
 
@@ -32,6 +33,7 @@ namespace Web.Services
                 var email = await _storage.GetAsync<string>("auth_email");
                 var userType = await _storage.GetAsync<string>("auth_usertype");
                 var tenant = await _storage.GetAsync<string>("auth_tenant");
+                var expiresAt = await _storage.GetAsync<long>("auth_expires_at");
 
                 if (token.Success && !string.IsNullOrEmpty(token.Value))
                 {
@@ -41,6 +43,9 @@ namespace Web.Services
                     Email = email.Value;
                     UserType = userType.Value;
                     TenantSubdomain = tenant.Value ?? "cliente1";
+                    TokenExpiresAt = expiresAt.Success
+                        ? new DateTime(expiresAt.Value, DateTimeKind.Utc)
+                        : DateTime.UtcNow.AddHours(8);
                     ExtractUserId();
                 }
             }
@@ -53,6 +58,7 @@ namespace Web.Services
             string username,
             string email,
             string userType,
+            DateTime expiresAt,
             string tenantSubdomain = "cliente1")
         {
             Token = token;
@@ -61,6 +67,7 @@ namespace Web.Services
             Email = email;
             UserType = userType;
             TenantSubdomain = tenantSubdomain;
+            TokenExpiresAt = expiresAt;
             ExtractUserId();
 
             await _storage.SetAsync("auth_token", token);
@@ -69,6 +76,22 @@ namespace Web.Services
             await _storage.SetAsync("auth_email", email);
             await _storage.SetAsync("auth_usertype", userType);
             await _storage.SetAsync("auth_tenant", tenantSubdomain);
+            await _storage.SetAsync("auth_expires_at", expiresAt.Ticks);
+
+            NotifyStateChanged();
+        }
+
+        /// <summary>Aggiorna solo token e refresh token (usato dall'auto-refresh).</summary>
+        public async Task UpdateTokensAsync(string token, string refreshToken, DateTime expiresAt)
+        {
+            Token = token;
+            RefreshToken = refreshToken;
+            TokenExpiresAt = expiresAt;
+            ExtractUserId();
+
+            await _storage.SetAsync("auth_token", token);
+            await _storage.SetAsync("auth_refresh_token", refreshToken);
+            await _storage.SetAsync("auth_expires_at", expiresAt.Ticks);
 
             NotifyStateChanged();
         }
@@ -82,6 +105,7 @@ namespace Web.Services
             UserType = null;
             TenantSubdomain = null;
             UserId = 0;
+            TokenExpiresAt = default;
 
             await _storage.DeleteAsync("auth_token");
             await _storage.DeleteAsync("auth_refresh_token");
@@ -89,6 +113,7 @@ namespace Web.Services
             await _storage.DeleteAsync("auth_email");
             await _storage.DeleteAsync("auth_usertype");
             await _storage.DeleteAsync("auth_tenant");
+            await _storage.DeleteAsync("auth_expires_at");
 
             NotifyStateChanged();
         }

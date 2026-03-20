@@ -20,10 +20,12 @@ namespace Api.Controllers
         }
 
         [HttpGet("conversations")]
-        public async Task<IActionResult> GetConversations()
+        public async Task<IActionResult> GetConversations(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
             var userId = GetUserId();
-            var conversations = await _chatService.GetUserConversationsAsync(userId);
+            var conversations = await _chatService.GetUserConversationsAsync(userId, page, pageSize);
             return Ok(conversations);
         }
 

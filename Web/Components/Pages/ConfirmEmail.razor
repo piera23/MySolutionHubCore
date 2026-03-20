@@ -1,0 +1,99 @@
+@page "/confirm-email"
+@rendermode InteractiveServer
+@using MudBlazor
+@inject NavigationManager Nav
+@inject ApiHttpClient ApiClient
+@inject ISnackbar Snackbar
+
+<PageTitle>Conferma Email</PageTitle>
+
+<div style="min-height:100vh;background:linear-gradient(135deg,#1e3a5f 0%,#2563EB 100%);display:flex;align-items:center;justify-content:center;padding:16px">
+    <MudPaper Elevation="4" Class="pa-8 rounded-xl" Style="width:100%;max-width:440px;text-align:center">
+
+        <MudIcon Icon="@Icons.Material.Filled.Hub"
+                 Style="font-size:3rem;color:#2563EB;margin-bottom:16px" />
+
+        @if (_loading)
+        {
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+            <MudText Typo="Typo.h6">Conferma in corso...</MudText>
+        }
+        else if (_success)
+        {
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
+                     Style="font-size:4rem;color:#22C55E;margin-bottom:12px" />
+            <MudText Typo="Typo.h5" Style="font-weight:700;margin-bottom:8px">
+                Email confermata!
+            </MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+                Il tuo account è attivo. Puoi ora accedere.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       FullWidth="true" Size="Size.Large"
+                       Href="/login" Style="font-weight:700">
+                Vai al Login
+            </MudButton>
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.Error"
+                     Style="font-size:4rem;color:#EF4444;margin-bottom:12px" />
+            <MudText Typo="Typo.h5" Style="font-weight:700;margin-bottom:8px">
+                Link non valido
+            </MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-6">
+                @_errorMessage
+            </MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       FullWidth="true" Href="/register">
+                Torna alla Registrazione
+            </MudButton>
+        }
+
+    </MudPaper>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] private int UserId { get; set; }
+    [SupplyParameterFromQuery] private string Token { get; set; } = "";
+
+    private bool _loading = true;
+    private bool _success = false;
+    private string _errorMessage = "Il link di conferma non è valido o è scaduto.";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        if (UserId <= 0 || string.IsNullOrWhiteSpace(Token))
+        {
+            _errorMessage = "Parametri mancanti nel link di conferma.";
+            _loading = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            var http = ApiClient.GetClient();
+            var encodedToken = Uri.EscapeDataString(Token);
+            var response = await http.GetAsync($"api/auth/confirm-email?userId={UserId}&token={encodedToken}");
+            _success = response.IsSuccessStatusCode;
+
+            if (!_success)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                _errorMessage = "Il link di conferma non è valido o è scaduto.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Errore di connessione: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+}
