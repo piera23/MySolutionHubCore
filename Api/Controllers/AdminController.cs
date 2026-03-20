@@ -5,6 +5,8 @@ using MasterDb.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers
 {
@@ -16,15 +18,18 @@ namespace Api.Controllers
         private readonly MasterDbContext _masterDb;
         private readonly ITenantDbContextFactory _tenantFactory;
         private readonly ITenantEncryption _encryption;
+        private readonly ILogger<AdminController> _logger;
 
         public AdminController(
             MasterDbContext masterDb,
             ITenantDbContextFactory tenantFactory,
-            ITenantEncryption encryption)
+            ITenantEncryption encryption,
+            ILogger<AdminController> logger)
         {
             _masterDb = masterDb;
             _tenantFactory = tenantFactory;
             _encryption = encryption;
+            _logger = logger;
         }
 
         // ── Stats globali ──────────────────────────────────────
@@ -173,9 +178,10 @@ namespace Api.Controllers
 
                 return Ok(new { tenant.TenantId, tenant.Subdomain, tenant.Name });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 await transaction.RollbackAsync();
+                _logger.LogError(ex, "Errore durante la creazione del tenant {TenantId}.", request.TenantId);
                 return StatusCode(500, "Errore interno durante la creazione del tenant.");
             }
         }
@@ -309,9 +315,22 @@ namespace Api.Controllers
 
     // Request records
     public record CreateTenantRequest(
-        string TenantId, string Subdomain,
-        string Name, string ConnectionString, string? Region);
+        [Required, MinLength(3), MaxLength(50), RegularExpression(@"^[a-z0-9\-]+$",
+            ErrorMessage = "TenantId può contenere solo lettere minuscole, numeri e trattini.")]
+        string TenantId,
 
-    public record UpdateTenantRequest(string Name, bool IsActive, string? Subdomain);
-    public record ToggleFeatureRequest(bool IsEnabled, string? Config);
+        [Required, MinLength(3), MaxLength(63), RegularExpression(@"^[a-z0-9\-]+$",
+            ErrorMessage = "Subdomain può contenere solo lettere minuscole, numeri e trattini.")]
+        string Subdomain,
+
+        [Required, MaxLength(200)] string Name,
+        [Required, MinLength(10)] string ConnectionString,
+        [MaxLength(50)] string? Region);
+
+    public record UpdateTenantRequest(
+        [Required, MaxLength(200)] string Name,
+        bool IsActive,
+        [MinLength(3), MaxLength(63)] string? Subdomain);
+
+    public record ToggleFeatureRequest(bool IsEnabled, [MaxLength(2000)] string? Config);
 }

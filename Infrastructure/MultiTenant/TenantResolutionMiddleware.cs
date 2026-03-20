@@ -1,12 +1,6 @@
 ﻿using Domain.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Infrastructure.MultiTenant
 {
@@ -68,25 +62,6 @@ namespace Infrastructure.MultiTenant
             }
 
             await _next(context);
-        }
-
-        private static string? ExtractSubdomain(string host)
-        {
-            if (string.IsNullOrEmpty(host)) return null;
-
-            // localhost o 127.0.0.1 — nessun sottodominio
-            if (host == "localhost" || host == "127.0.0.1") return null;
-
-            // cliente1.localhost → "cliente1"
-            if (host.EndsWith(".localhost"))
-                return host[..host.LastIndexOf(".localhost")];
-
-            // cliente1.app.com → "cliente1"
-            var parts = host.Split('.');
-            if (parts.Length >= 3)
-                return parts[0];
-
-            return null;
         }
     }
 }

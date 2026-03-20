@@ -27,14 +27,8 @@ namespace Api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var users = await _userManager.Users.ToListAsync();
-
-            var result = new List<object>();
-            foreach (var u in users)
-            {
-                var roles = await _userManager.GetRolesAsync(u);
-                var token = _jwtService.GenerateToken(u, roles);
-                result.Add(new
+            var users = await _userManager.Users
+                .Select(u => new
                 {
                     u.Id,
                     u.UserName,
@@ -48,12 +42,11 @@ namespace Api.Controllers
                     u.UserType,
                     u.LastLoginAt,
                     u.CreatedAt,
-                    u.UpdatedAt,
-                    Token = token
-                });
-            }
+                    u.UpdatedAt
+                })
+                .ToListAsync();
 
-            return Ok(result);
+            return Ok(users);
         }
 
         [HttpGet("{id}")]
@@ -61,9 +54,6 @@ namespace Api.Controllers
         {
             var user = await _userManager.FindByIdAsync(id.ToString());
             if (user is null) return NotFound();
-
-            var roles = await _userManager.GetRolesAsync(user);
-            var token = _jwtService.GenerateToken(user, roles);
 
             return Ok(new
             {
@@ -79,8 +69,7 @@ namespace Api.Controllers
                 user.UserType,
                 user.LastLoginAt,
                 user.CreatedAt,
-                user.UpdatedAt,
-                Token = token
+                user.UpdatedAt
             });
         }
 

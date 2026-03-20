@@ -1,14 +1,14 @@
 ﻿using Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class FeedController : ControllerBase
+    public class FeedController : TenantApiControllerBase
     {
         private readonly IActivityService _activityService;
 
@@ -49,12 +49,6 @@ namespace Api.Controllers
             return NoContent();
         }
 
-        private int GetUserId()
-        {
-            var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return int.TryParse(claim, out var id) ? id : 0;
-        }
-
         [HttpPost("publish")]
         public async Task<IActionResult> Publish([FromBody] PublishRequest request)
         {
@@ -66,6 +60,8 @@ namespace Api.Controllers
             return NoContent();
         }
 
-        public record PublishRequest(string EventType, string? Payload);
+        public record PublishRequest(
+            [Required, MaxLength(100)] string EventType,
+            [MaxLength(5000)] string? Payload);
     }
 }

@@ -1,14 +1,14 @@
 ﻿using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class ChatController : ControllerBase
+    public class ChatController : TenantApiControllerBase
     {
         private readonly IChatService _chatService;
 
@@ -70,13 +70,13 @@ namespace Api.Controllers
             return NoContent();
         }
 
-        private int GetUserId()
-        {
-            var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return int.TryParse(claim, out var id) ? id : 0;
-        }
     }
 
-    public record CreateGroupRequest(string Title, IEnumerable<int> MemberIds);
-    public record SendMessageRequest(string Body, string? AttachmentUrl);
+    public record CreateGroupRequest(
+        [Required, MaxLength(200)] string Title,
+        [Required] IEnumerable<int> MemberIds);
+
+    public record SendMessageRequest(
+        [Required, MaxLength(4000)] string Body,
+        [Url, MaxLength(500)] string? AttachmentUrl);
 }
