@@ -1,22 +1,33 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace Application.Features.Auth
 {
     public record RegisterRequest(
-    string Username,
-    string Email,
-    string Password,
-    string? FirstName,
-    string? LastName,
-    string UserType  // "Internal" o "External"
-);
+        [Required, MinLength(3), MaxLength(50)]
+        string Username,
+
+        [Required, EmailAddress, MaxLength(256)]
+        string Email,
+
+        [Required, MinLength(8), MaxLength(100)]
+        string Password,
+
+        [MaxLength(100)]
+        string? FirstName,
+
+        [MaxLength(100)]
+        string? LastName,
+
+        [Required, RegularExpression("^(Internal|External)$",
+            ErrorMessage = "UserType deve essere 'Internal' o 'External'.")]
+        string UserType
+    );
 
     public record LoginRequest(
+        [Required, EmailAddress, MaxLength(256)]
         string Email,
+
+        [Required, MinLength(1)]
         string Password
     );
 

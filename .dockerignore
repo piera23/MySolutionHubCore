@@ -1,0 +1,10 @@
+**/.git
+**/.vs
+**/bin
+**/obj
+**/*.user
+**/*.suo
+**/node_modules
+**/.env
+**/appsettings.Development.json
+**/Dockerfile*

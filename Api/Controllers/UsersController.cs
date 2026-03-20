@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
 namespace Api.Controllers
@@ -191,13 +192,13 @@ namespace Api.Controllers
     }
 
     public record UpdateProfileRequest(
-        string FirstName,
-        string LastName,
-        string? PhoneNumber,
-        string? AvatarUrl);
+        [MaxLength(100)] string FirstName,
+        [MaxLength(100)] string LastName,
+        [Phone, MaxLength(20)] string? PhoneNumber,
+        [Url, MaxLength(500)] string? AvatarUrl);
 
     public record ChangePasswordRequest(
-        string CurrentPassword,
-        string NewPassword);
+        [Required] string CurrentPassword,
+        [Required, MinLength(8), MaxLength(100)] string NewPassword);
 
 }

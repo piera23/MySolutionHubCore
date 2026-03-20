@@ -79,6 +79,9 @@ builder.Services.AddSignalR();
 builder.Services.AddMasterDb(builder.Configuration, builder.Environment);
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddHealthChecks()
+    .AddCheck<Api.HealthChecks.MasterDbHealthCheck>("master-db", tags: ["ready"]);
+
 // ── App ──────────────────────────────────────────
 var app = builder.Build();
 
@@ -116,6 +119,13 @@ app.UseAuthentication();    // 2. Chi sei?
 app.UseAuthorization();     // 3. Cosa puoi fare?
 
 app.MapControllers();
+
+// Health Checks
+app.MapHealthChecks("/health");                       // liveness
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 // SignalR Hubs
 app.MapHub<Infrastructure.Hubs.NotificationHub>("/hubs/notifications");
