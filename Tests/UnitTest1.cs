@@ -1,11 +1,6 @@
-namespace Tests
-{
-    public class UnitTest1
-    {
-        [Fact]
-        public void Test1()
-        {
+// File mantenuto vuoto — i test si trovano nei file dedicati per area:
+// - TenantContextTests.cs
+// - TenantEncryptionTests.cs
+// - TenantResolverTests.cs
 
-        }
-    }
-}
+namespace Tests;

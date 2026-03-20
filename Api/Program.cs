@@ -82,6 +82,8 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // ── App ──────────────────────────────────────────
 var app = builder.Build();
 
+app.UseMiddleware<Api.Middleware.GlobalExceptionMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -93,15 +95,16 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+    var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
 
     // Applica migration MasterDb prima del seed
     await masterDb.Database.MigrateAsync();
 
     var encryption = scope.ServiceProvider.GetRequiredService<ITenantEncryption>();
-    await MasterDbSeeder.SeedAsync(masterDb, encryption);
+    await MasterDbSeeder.SeedAsync(masterDb, encryption, loggerFactory.CreateLogger("MasterDbSeeder"));
 
     // Seed tenant DB con la connection string diretta
-    await TenantDbSeeder.SeedAsync("Data Source=tenant001.sqlite");
+    await TenantDbSeeder.SeedAsync("Data Source=tenant001.sqlite", loggerFactory.CreateLogger("TenantDbSeeder"));
 }
 
 app.UseHttpsRedirection();

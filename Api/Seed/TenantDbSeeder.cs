@@ -2,12 +2,13 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Api.Seed
 {
     public static class TenantDbSeeder
     {
-        public static async Task SeedAsync(string connectionString)
+        public static async Task SeedAsync(string connectionString, ILogger logger)
         {
             var options = new DbContextOptionsBuilder<BaseAppDbContext>()
                 .UseSqlite(connectionString)
@@ -32,11 +33,11 @@ namespace Api.Seed
                 if (!await roleManager.RoleExistsAsync(role))
                 {
                     await roleManager.CreateAsync(new IdentityRole<int>(role));
-                    Console.WriteLine($"✅ Ruolo '{role}' creato.");
+                    logger.LogInformation("Ruolo '{Role}' creato.", role);
                 }
             }
 
-            Console.WriteLine($"✅ DB tenant migrato: {connectionString}");
+            logger.LogInformation("DB tenant migrato: {ConnectionString}", connectionString);
         }
     }
 }

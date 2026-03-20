@@ -2,6 +2,7 @@
 using MasterDb.Entities;
 using MasterDb.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Api.Seed
 {
@@ -9,7 +10,8 @@ namespace Api.Seed
     {
         public static async Task SeedAsync(
     MasterDbContext masterDb,
-    ITenantEncryption encryption)
+    ITenantEncryption encryption,
+    ILogger logger)
         {
             if (await masterDb.Tenants.AnyAsync()) return;
 
@@ -44,12 +46,12 @@ namespace Api.Seed
 
                 await masterDb.SaveChangesAsync();
                 await transaction.CommitAsync();
-                Console.WriteLine("✅ Tenant001 inserito nel Master DB.");
+                logger.LogInformation("Tenant001 inserito nel Master DB.");
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                Console.WriteLine($"❌ Errore seed: {ex.Message}");
+                logger.LogError(ex, "Errore durante il seed del Master DB.");
                 throw;
             }
         }

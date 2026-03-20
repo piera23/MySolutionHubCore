@@ -44,7 +44,7 @@ namespace Infrastructure.MultiTenant
                     identifier = host;
             }
 
-            Console.WriteLine($"[Tenant] Identifier: {identifier}");
+            _logger.LogDebug("[Tenant] Identifier: {Identifier}", identifier);
 
             if (!string.IsNullOrEmpty(identifier))
             {
@@ -53,12 +53,12 @@ namespace Infrastructure.MultiTenant
                     var tenant = await resolver.ResolveAsync(identifier);
                     if (tenant is not null)
                     {
-                        Console.WriteLine($"[Tenant] Resolved: {tenant.TenantId}");
+                        _logger.LogInformation("[Tenant] Resolved: {TenantId}", tenant.TenantId);
                         tenantContext.SetTenant(tenant.TenantId, tenant.TenantName, tenant.ConnectionString);
                     }
                     else
                     {
-                        Console.WriteLine($"[Tenant] NOT FOUND: {identifier}");
+                        _logger.LogWarning("[Tenant] NOT FOUND: {Identifier}", identifier);
                     }
                 }
                 catch (Exception ex)
