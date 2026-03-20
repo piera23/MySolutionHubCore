@@ -122,16 +122,14 @@
 
                 if (result is not null)
                 {
-                    // Estrai il tenant dal URL corrente
                     var uri = new Uri(Nav.Uri);
                     var host = uri.Host;
-                    var tenantSubdomain = host.Contains('.') ? host.Split('.')[0] : "cliente1"; // fallback per localhost
+                    var tenantSubdomain = host.Contains('.') ? host.Split('.')[0] : "cliente1";
 
                     await AuthState.SetUserAsync(
-                        result.Token, result.Username,
-                        result.Email, result.UserType,
-                        tenantSubdomain);
-                    //await AuthState.SetUserAsync(result.Token, result.Username,result.Email, result.UserType);
+                        result.Token, result.RefreshToken,
+                        result.Username, result.Email,
+                        result.UserType, tenantSubdomain);
 
                     Console.WriteLine($"Login OK — navigating to home");
                     _navigateToHome = true;
@@ -168,6 +166,6 @@
         }
     }
 
-    private record AuthResponse(string Token, string Username,
-        string Email, string UserType, DateTime ExpiresAt);
+    private record AuthResponse(string Token, string RefreshToken,
+        string Username, string Email, string UserType, DateTime ExpiresAt);
 }

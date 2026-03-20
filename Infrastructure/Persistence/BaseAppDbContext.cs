@@ -15,6 +15,9 @@ namespace Infrastructure.Persistence
     {
         public BaseAppDbContext(DbContextOptions options) : base(options) { }
 
+        // Auth
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
         // Social Layer
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
@@ -113,6 +116,20 @@ namespace Infrastructure.Persistence
             {
                 e.HasKey(r => r.Id);
                 e.HasIndex(r => new { r.MessageId, r.UserId }).IsUnique();
+            });
+
+            // RefreshToken
+            mb.Entity<RefreshToken>(e =>
+            {
+                e.HasKey(r => r.Id);
+                e.HasIndex(r => r.Token).IsUnique();
+                e.HasIndex(r => r.UserId);
+                e.Property(r => r.Token).HasMaxLength(500).IsRequired();
+                e.Property(r => r.ReplacedByToken).HasMaxLength(500);
+                e.HasOne<ApplicationUser>()
+                 .WithMany()
+                 .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
             });
 
             ConfigureTenantSpecific(mb);

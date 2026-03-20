@@ -69,12 +69,17 @@ namespace Infrastructure.MultiTenant
                 .Select(f => f.FeatureKey)
                 .ToListAsync(ct);
 
+            var settings = await _masterDb.TenantSettings
+                .Where(s => s.TenantId == tenant.TenantId)
+                .ToDictionaryAsync(s => s.Key, s => s.Value, ct);
+
             var entry = new TenantCacheEntry
             {
                 TenantId = tenant.TenantId,
                 TenantName = tenant.Name,
                 ConnectionStringEncrypted = connection.ConnectionStringEncrypted,
                 EnabledFeatures = features,
+                Settings = settings
             };
 
             _cache.Set(cacheKey, entry, CacheTtl);

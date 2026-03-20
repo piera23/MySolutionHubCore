@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 
 namespace Web.Services
 {
@@ -7,6 +7,7 @@ namespace Web.Services
         private readonly ProtectedSessionStorage _storage;
 
         public string? Token { get; private set; }
+        public string? RefreshToken { get; private set; }
         public string? Username { get; private set; }
         public string? Email { get; private set; }
         public string? UserType { get; private set; }
@@ -26,6 +27,7 @@ namespace Web.Services
             try
             {
                 var token = await _storage.GetAsync<string>("auth_token");
+                var refreshToken = await _storage.GetAsync<string>("auth_refresh_token");
                 var username = await _storage.GetAsync<string>("auth_username");
                 var email = await _storage.GetAsync<string>("auth_email");
                 var userType = await _storage.GetAsync<string>("auth_usertype");
@@ -34,6 +36,7 @@ namespace Web.Services
                 if (token.Success && !string.IsNullOrEmpty(token.Value))
                 {
                     Token = token.Value;
+                    RefreshToken = refreshToken.Value;
                     Username = username.Value;
                     Email = email.Value;
                     UserType = userType.Value;
@@ -44,9 +47,16 @@ namespace Web.Services
             catch { }
         }
 
-        public async Task SetUserAsync(string token, string username, string email, string userType, string tenantSubdomain = "cliente1")
+        public async Task SetUserAsync(
+            string token,
+            string refreshToken,
+            string username,
+            string email,
+            string userType,
+            string tenantSubdomain = "cliente1")
         {
             Token = token;
+            RefreshToken = refreshToken;
             Username = username;
             Email = email;
             UserType = userType;
@@ -54,6 +64,7 @@ namespace Web.Services
             ExtractUserId();
 
             await _storage.SetAsync("auth_token", token);
+            await _storage.SetAsync("auth_refresh_token", refreshToken);
             await _storage.SetAsync("auth_username", username);
             await _storage.SetAsync("auth_email", email);
             await _storage.SetAsync("auth_usertype", userType);
@@ -65,6 +76,7 @@ namespace Web.Services
         public async Task LogoutAsync()
         {
             Token = null;
+            RefreshToken = null;
             Username = null;
             Email = null;
             UserType = null;
@@ -72,6 +84,7 @@ namespace Web.Services
             UserId = 0;
 
             await _storage.DeleteAsync("auth_token");
+            await _storage.DeleteAsync("auth_refresh_token");
             await _storage.DeleteAsync("auth_username");
             await _storage.DeleteAsync("auth_email");
             await _storage.DeleteAsync("auth_usertype");

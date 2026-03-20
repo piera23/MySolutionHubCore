@@ -55,6 +55,8 @@ namespace Infrastructure
             services.AddScoped<IChatService, ChatService>();
             // Provisioning
             services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
+            // Migration background service
+            services.AddHostedService<TenantMigrationHostedService>();
 
             // MultiTenant
             services.AddScoped<TenantContext>();

@@ -1,12 +1,10 @@
-﻿using Application.Features.Auth;
+using Application.Features.Auth;
 using Application.Interfaces;
+using Domain.Entities;
+using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Infrastructure.Identity
 {
@@ -14,15 +12,21 @@ namespace Infrastructure.Identity
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IJwtService _jwtService;
+        private readonly BaseAppDbContext _db;
         private readonly ILogger<AuthService> _logger;
+
+        // Durata del refresh token: 7 giorni
+        private static readonly TimeSpan RefreshTokenTtl = TimeSpan.FromDays(7);
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
             IJwtService jwtService,
+            BaseAppDbContext db,
             ILogger<AuthService> logger)
         {
             _userManager = userManager;
             _jwtService = jwtService;
+            _db = db;
             _logger = logger;
         }
 
@@ -30,11 +34,10 @@ namespace Infrastructure.Identity
             RegisterRequest request,
             CancellationToken ct = default)
         {
-            // Verifica se l'email esiste già
             var existing = await _userManager.FindByEmailAsync(request.Email);
             if (existing is not null)
             {
-                _logger.LogWarning("Tentativo di registrazione con email già esistente: {Email}", request.Email);
+                _logger.LogWarning("Registrazione fallita — email già in uso: {Email}", request.Email);
                 return null;
             }
 
@@ -54,7 +57,6 @@ namespace Infrastructure.Identity
             };
 
             var result = await _userManager.CreateAsync(user, request.Password);
-
             if (!result.Succeeded)
             {
                 _logger.LogWarning("Registrazione fallita per {Email}: {Errors}",
@@ -63,20 +65,10 @@ namespace Infrastructure.Identity
                 return null;
             }
 
-            // Assegna ruolo base
             var role = userType == UserType.Internal ? "Internal" : "External";
             await _userManager.AddToRoleAsync(user, role);
 
-            var roles = await _userManager.GetRolesAsync(user);
-            var token = _jwtService.GenerateToken(user, roles);
-
-            return new AuthResponse(
-                Token: token,
-                Username: user.UserName!,
-                Email: user.Email!,
-                UserType: user.UserType.ToString(),
-                ExpiresAt: DateTime.UtcNow.AddHours(8)
-            );
+            return await BuildAuthResponseAsync(user, ct);
         }
 
         public async Task<AuthResponse?> LoginAsync(
@@ -84,7 +76,6 @@ namespace Infrastructure.Identity
             CancellationToken ct = default)
         {
             var user = await _userManager.FindByEmailAsync(request.Email);
-
             if (user is null || !user.IsActive || user.IsDeleted)
             {
                 _logger.LogWarning("Login fallito — utente non trovato: {Email}", request.Email);
@@ -98,20 +89,122 @@ namespace Infrastructure.Identity
                 return null;
             }
 
-            // Aggiorna LastLoginAt
             user.LastLoginAt = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
 
+            return await BuildAuthResponseAsync(user, ct);
+        }
+
+        public async Task<AuthResponse?> RefreshAsync(
+            string refreshToken,
+            CancellationToken ct = default)
+        {
+            var stored = await _db.RefreshTokens
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(r => r.Token == refreshToken, ct);
+
+            if (stored is null)
+            {
+                _logger.LogWarning("Refresh token non trovato: {Token}", refreshToken[..8]);
+                return null;
+            }
+
+            if (stored.IsRevoked)
+            {
+                // Possibile riuso di token rubato: revoca tutta la catena
+                _logger.LogWarning(
+                    "Refresh token già revocato per utente {UserId}. Possibile riuso — revoca catena.",
+                    stored.UserId);
+                await RevokeAllForUserAsync(stored.UserId, ct);
+                return null;
+            }
+
+            if (stored.ExpiresAt < DateTime.UtcNow)
+            {
+                _logger.LogWarning("Refresh token scaduto per utente {UserId}.", stored.UserId);
+                return null;
+            }
+
+            var user = await _userManager.FindByIdAsync(stored.UserId.ToString());
+            if (user is null || !user.IsActive || user.IsDeleted)
+            {
+                _logger.LogWarning("Utente non attivo per refresh token, UserId: {UserId}.", stored.UserId);
+                return null;
+            }
+
+            // Token rotation: revoca il vecchio, crea il nuovo
+            var newRefreshToken = GenerateToken();
+            stored.IsRevoked = true;
+            stored.ReplacedByToken = newRefreshToken;
+            stored.UpdatedAt = DateTime.UtcNow;
+
+            var response = await BuildAuthResponseAsync(user, ct, newRefreshToken);
+            return response;
+        }
+
+        public async Task RevokeAsync(
+            int userId,
+            string refreshToken,
+            CancellationToken ct = default)
+        {
+            var stored = await _db.RefreshTokens
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(r => r.Token == refreshToken && r.UserId == userId, ct);
+
+            if (stored is null || stored.IsRevoked) return;
+
+            stored.IsRevoked = true;
+            stored.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Refresh token revocato per utente {UserId}.", userId);
+        }
+
+        // ── Helpers ───────────────────────────────────────────────
+
+        private async Task<AuthResponse> BuildAuthResponseAsync(
+            ApplicationUser user,
+            CancellationToken ct,
+            string? preGeneratedRefreshToken = null)
+        {
             var roles = await _userManager.GetRolesAsync(user);
-            var token = _jwtService.GenerateToken(user, roles);
+            var jwt = _jwtService.GenerateToken(user, roles);
+
+            var rtValue = preGeneratedRefreshToken ?? GenerateToken();
+            _db.RefreshTokens.Add(new RefreshToken
+            {
+                UserId = user.Id,
+                Token = rtValue,
+                ExpiresAt = DateTime.UtcNow.Add(RefreshTokenTtl),
+                CreatedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync(ct);
 
             return new AuthResponse(
-                Token: token,
+                Token: jwt,
+                RefreshToken: rtValue,
                 Username: user.UserName!,
                 Email: user.Email!,
                 UserType: user.UserType.ToString(),
                 ExpiresAt: DateTime.UtcNow.AddHours(8)
             );
         }
+
+        private async Task RevokeAllForUserAsync(int userId, CancellationToken ct)
+        {
+            var tokens = await _db.RefreshTokens
+                .IgnoreQueryFilters()
+                .Where(r => r.UserId == userId && !r.IsRevoked)
+                .ToListAsync(ct);
+
+            foreach (var t in tokens)
+            {
+                t.IsRevoked = true;
+                t.UpdatedAt = DateTime.UtcNow;
+            }
+            await _db.SaveChangesAsync(ct);
+        }
+
+        private static string GenerateToken() => Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
     }
 }

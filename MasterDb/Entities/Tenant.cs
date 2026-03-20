@@ -18,5 +18,6 @@ namespace MasterDb.Entities
         public ICollection<TenantConnection> Connections { get; set; } = new List<TenantConnection>();
         public ICollection<TenantFeature> Features { get; set; } = new List<TenantFeature>();
         public ICollection<TenantMigrationLog> MigrationLogs { get; set; } = new List<TenantMigrationLog>();
+        public ICollection<TenantSetting> Settings { get; set; } = new List<TenantSetting>();
     }
 }

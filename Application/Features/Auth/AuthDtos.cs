@@ -33,9 +33,14 @@ namespace Application.Features.Auth
 
     public record AuthResponse(
         string Token,
+        string RefreshToken,
         string Username,
         string Email,
         string UserType,
         DateTime ExpiresAt
+    );
+
+    public record RefreshRequest(
+        [Required] string RefreshToken
     );
 }

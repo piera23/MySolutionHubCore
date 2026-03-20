@@ -372,6 +372,82 @@ namespace Api.Controllers
             return Ok(new { userId, user.IsActive });
         }
 
+        // ── Tenant Settings ────────────────────────────────────
+
+        [HttpGet("tenants/{tenantId}/settings")]
+        public async Task<IActionResult> GetSettings(string tenantId)
+        {
+            var settings = await _masterDb.TenantSettings
+                .Where(s => s.TenantId == tenantId)
+                .OrderBy(s => s.Key)
+                .Select(s => new { s.Id, s.Key, s.Value, s.UpdatedAt })
+                .ToListAsync();
+
+            return Ok(settings);
+        }
+
+        [HttpPut("tenants/{tenantId}/settings/{key}")]
+        public async Task<IActionResult> UpsertSetting(
+            string tenantId, string key,
+            [FromBody] UpsertSettingRequest request)
+        {
+            var setting = await _masterDb.TenantSettings
+                .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.Key == key);
+
+            if (setting is null)
+            {
+                // Verifica che il tenant esista prima di inserire
+                if (!await _masterDb.Tenants.AnyAsync(t => t.TenantId == tenantId))
+                    return NotFound($"Tenant '{tenantId}' non trovato.");
+
+                _masterDb.TenantSettings.Add(new MasterDb.Entities.TenantSetting
+                {
+                    TenantId = tenantId,
+                    Key = key,
+                    Value = request.Value,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                setting.Value = request.Value;
+                setting.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _masterDb.SaveChangesAsync();
+
+            // Invalida la cache così le nuove impostazioni sono immediatamente visibili
+            var subdomain = await _masterDb.Tenants
+                .Where(t => t.TenantId == tenantId)
+                .Select(t => t.Subdomain)
+                .FirstOrDefaultAsync();
+            if (subdomain is not null)
+                _cache.Remove($"tenant:{subdomain}");
+
+            return Ok(new { tenantId, key, request.Value });
+        }
+
+        [HttpDelete("tenants/{tenantId}/settings/{key}")]
+        public async Task<IActionResult> DeleteSetting(string tenantId, string key)
+        {
+            var setting = await _masterDb.TenantSettings
+                .FirstOrDefaultAsync(s => s.TenantId == tenantId && s.Key == key);
+
+            if (setting is null) return NotFound();
+
+            _masterDb.TenantSettings.Remove(setting);
+            await _masterDb.SaveChangesAsync();
+
+            var subdomain = await _masterDb.Tenants
+                .Where(t => t.TenantId == tenantId)
+                .Select(t => t.Subdomain)
+                .FirstOrDefaultAsync();
+            if (subdomain is not null)
+                _cache.Remove($"tenant:{subdomain}");
+
+            return NoContent();
+        }
+
         [HttpGet("tenants/{tenantId}/migrations")]
         public async Task<IActionResult> GetMigrationLogs(string tenantId)
         {
@@ -437,4 +513,6 @@ namespace Api.Controllers
         [MinLength(3), MaxLength(63)] string? Subdomain);
 
     public record ToggleFeatureRequest(bool IsEnabled, [MaxLength(2000)] string? Config);
+
+    public record UpsertSettingRequest([Required, MaxLength(2000)] string Value);
 }

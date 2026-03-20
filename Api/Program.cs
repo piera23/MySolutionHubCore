@@ -1,5 +1,6 @@
-﻿using Api.Seed;
+using Api.Seed;
 using Domain.Interfaces;
+using Hangfire;
 using Infrastructure;
 using MasterDb;
 using MasterDb.Persistence;
@@ -29,7 +30,6 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "MySolutionHub API", Version = "v1" });
 
-    // Header X-Tenant-Id per sviluppo
     c.AddSecurityDefinition("TenantId", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = "Inserisci il TenantId (es. cliente1)",
@@ -79,6 +79,25 @@ builder.Services.AddSignalR();
 builder.Services.AddMasterDb(builder.Configuration, builder.Environment);
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// ── Hangfire (solo in produzione con SQL Server) ─────────────
+if (!builder.Environment.IsDevelopment())
+{
+    var hangfireCs = builder.Configuration.GetConnectionString("MasterDb")
+        ?? throw new InvalidOperationException("Connection string 'MasterDb' non trovata per Hangfire.");
+
+    builder.Services.AddHangfire(cfg => cfg
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UseSqlServerStorage(hangfireCs));
+
+    builder.Services.AddHangfireServer(opts =>
+    {
+        opts.WorkerCount = 2;
+        opts.Queues = new[] { "migrations", "default" };
+    });
+}
+
 builder.Services.AddHealthChecks()
     .AddCheck<Api.HealthChecks.MasterDbHealthCheck>("master-db", tags: ["ready"]);
 
@@ -93,41 +112,49 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
     var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
 
-    // Applica migration MasterDb prima del seed
     await masterDb.Database.MigrateAsync();
 
     var encryption = scope.ServiceProvider.GetRequiredService<ITenantEncryption>();
     await MasterDbSeeder.SeedAsync(masterDb, encryption, loggerFactory.CreateLogger("MasterDbSeeder"));
-
-    // Seed tenant DB con la connection string diretta
     await TenantDbSeeder.SeedAsync("Data Source=tenant001.sqlite", loggerFactory.CreateLogger("TenantDbSeeder"));
+}
+
+// ── Hangfire dashboard (solo produzione) — protetta da ruolo Admin ──
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = new[] { new Api.Hangfire.HangfireAdminAuthFilter() }
+    });
+
+    // Job ricorrente: controllo migrazioni ogni 12 ore
+    RecurringJob.AddOrUpdate<Infrastructure.Services.TenantMigrationHostedService>(
+        "tenant-migrations",
+        svc => svc.TriggerManualRunAsync(CancellationToken.None),
+        "0 */12 * * *");
 }
 
 app.UseHttpsRedirection();
 
-// Tenant resolution PRIMA di auth e controller
-app.UseMultiTenant();       // 1. Risolvi tenant
+app.UseMultiTenant();
 app.UseCors("BlazorWeb");
-app.UseAuthentication();    // 2. Chi sei?
-app.UseAuthorization();     // 3. Cosa puoi fare?
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 
-// Health Checks
-app.MapHealthChecks("/health");                       // liveness
+app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready")
 });
 
-// SignalR Hubs
 app.MapHub<Infrastructure.Hubs.NotificationHub>("/hubs/notifications");
 app.MapHub<Infrastructure.Hubs.ChatHub>("/hubs/chat");
 
