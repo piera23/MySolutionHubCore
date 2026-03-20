@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
@@ -23,7 +22,6 @@ namespace Api.Controllers
         private readonly ITenantEncryption _encryption;
         private readonly ITenantProvisioningService _provisioning;
         private readonly IMemoryCache _cache;
-        private readonly IHostEnvironment _env;
         private readonly IAuditService _audit;
         private readonly ILogger<AdminController> _logger;
 
@@ -32,7 +30,6 @@ namespace Api.Controllers
             ITenantEncryption encryption,
             ITenantProvisioningService provisioning,
             IMemoryCache cache,
-            IHostEnvironment env,
             IAuditService audit,
             ILogger<AdminController> logger)
         {
@@ -40,7 +37,6 @@ namespace Api.Controllers
             _encryption = encryption;
             _provisioning = provisioning;
             _cache = cache;
-            _env = env;
             _audit = audit;
             _logger = logger;
         }
