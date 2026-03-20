@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers
 {
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/[controller]")]
     public class DiagnosticsController : ControllerBase
@@ -37,7 +38,6 @@ namespace Api.Controllers
         }
 
         [HttpGet("master-db")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetMasterDb([FromServices] MasterDbContext masterDb)
         {
             var tenants = await masterDb.Tenants.ToListAsync();
@@ -72,7 +72,6 @@ namespace Api.Controllers
         }
 
         [HttpPost("fix-tenant")]
-        [AllowAnonymous]
         public async Task<IActionResult> FixTenant(
     [FromServices] MasterDbContext masterDb,
     [FromServices] ITenantEncryption encryption)

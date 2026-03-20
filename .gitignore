@@ -361,3 +361,14 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# ASP.NET Core secrets and environment-specific configs
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
+secrets.json
+
+# SQLite database files (generated at runtime)
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

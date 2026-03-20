@@ -173,19 +173,12 @@ namespace Api.Controllers
 
                 return Ok(new { tenant.TenantId, tenant.Subdomain, tenant.Name });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 await transaction.RollbackAsync();
-                return StatusCode(500, ex.Message);
+                return StatusCode(500, "Errore interno durante la creazione del tenant.");
             }
         }
-
-        public record CreateTenantRequest(
-            string TenantId,
-            string Subdomain,
-            string Name,
-            string ConnectionString,
-            string? Region);
 
         [HttpPut("tenants/{tenantId}")]
         public async Task<IActionResult> UpdateTenant(string tenantId, [FromBody] UpdateTenantRequest request)
@@ -217,8 +210,6 @@ namespace Api.Controllers
             await _masterDb.SaveChangesAsync();
             return Ok(new { tenant.TenantId, tenant.Subdomain, tenant.Name, tenant.IsActive });
         }
-
-        public record UpdateTenantRequest(string Name, bool IsActive, string? Subdomain);
 
         // ── Feature management ─────────────────────────────────
 
@@ -321,6 +312,6 @@ namespace Api.Controllers
         string TenantId, string Subdomain,
         string Name, string ConnectionString, string? Region);
 
-    public record UpdateTenantRequest(string Name, bool IsActive);
+    public record UpdateTenantRequest(string Name, bool IsActive, string? Subdomain);
     public record ToggleFeatureRequest(bool IsEnabled, string? Config);
 }

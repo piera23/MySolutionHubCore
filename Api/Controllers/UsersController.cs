@@ -48,7 +48,6 @@ namespace Api.Controllers
                     u.LastLoginAt,
                     u.CreatedAt,
                     u.UpdatedAt,
-                    u.PasswordHash,
                     Token = token
                 });
             }
@@ -80,7 +79,6 @@ namespace Api.Controllers
                 user.LastLoginAt,
                 user.CreatedAt,
                 user.UpdatedAt,
-                user.PasswordHash,
                 Token = token
             });
         }
@@ -124,8 +122,7 @@ namespace Api.Controllers
                 user.UserType,
                 user.LastLoginAt,
                 user.CreatedAt,
-                user.UpdatedAt,
-                user.PasswordHash
+                user.UpdatedAt
             });
         }
 
@@ -177,7 +174,7 @@ namespace Api.Controllers
         }
 
         [HttpPost("{id}/make-admin")]
-        [AllowAnonymous] // temporaneo per setup
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> MakeAdmin(int id)
         {
             var user = await _userManager.FindByIdAsync(id.ToString());
