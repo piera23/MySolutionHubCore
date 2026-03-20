@@ -107,6 +107,24 @@
             </div>
         }
 
+        <!-- Conferma avvenuta registrazione -->
+        @if (_registrationComplete)
+        {
+            <MudAlert Severity="Severity.Success" Class="mt-4" Icon="@Icons.Material.Filled.MarkEmailRead">
+                <MudText Typo="Typo.body1" Style="font-weight:600">Account creato!</MudText>
+                <MudText Typo="Typo.body2">
+                    Abbiamo inviato un'email di conferma a <strong>@_form.Email</strong>.
+                    Clicca il link nell'email per attivare il tuo account.
+                </MudText>
+            </MudAlert>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       FullWidth="true" Class="mt-3" Href="/login">
+                Vai al Login
+            </MudButton>
+        }
+        else
+        {
+
         <!-- Bottone registrazione -->
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -140,6 +158,8 @@
             </MudText>
         </div>
 
+        } @* fine else _registrationComplete *@
+
     </MudPaper>
 </div>
 
@@ -149,6 +169,7 @@
     private bool _loading = false;
     private bool _showPassword = false;
     private bool _showConfirm = false;
+    private bool _registrationComplete = false;
     private string _tenantName = "";
     private string _tenantSubdomain = "";
 
@@ -268,8 +289,7 @@
 
             if (response.IsSuccessStatusCode)
             {
-                Snackbar.Add("Account creato con successo! Ora puoi accedere.", Severity.Success);
-                Nav.NavigateTo("/login");
+                _registrationComplete = true;
             }
             else
             {

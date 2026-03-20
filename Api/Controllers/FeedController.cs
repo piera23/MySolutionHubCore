@@ -2,6 +2,7 @@
 using Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers
@@ -10,6 +11,7 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [RequireFeature("social:feed")]
+    [EnableRateLimiting("api")]
     public class FeedController : TenantApiControllerBase
     {
         private readonly IActivityService _activityService;

@@ -237,6 +237,57 @@ namespace Infrastructure.Identity
             return true;
         }
 
+        public async Task ForgotPasswordAsync(string email, CancellationToken ct = default)
+        {
+            // Anti-enumeration: non riveliamo se l'email esiste o no
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user is null || !user.IsActive || user.IsDeleted) return;
+
+            try
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var encodedToken = Uri.EscapeDataString(token);
+                var baseUrl = _config["App:BaseUrl"] ?? "http://localhost:5001";
+                var link = $"{baseUrl}/reset-password?userId={user.Id}&token={encodedToken}";
+
+                var body = $"""
+                    <p>Ciao {user.FirstName ?? user.UserName},</p>
+                    <p>Hai richiesto il reset della password. Clicca sul link:</p>
+                    <p><a href="{link}">{link}</a></p>
+                    <p>Il link è valido per 1 ora. Se non hai fatto questa richiesta, ignora questa email.</p>
+                    """;
+
+                await _email.SendAsync(user.Email!, "Reset password MySolutionHub", body, ct);
+                _logger.LogInformation("Email reset password inviata a {Email}.", user.Email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Errore invio email reset password a {Email}.", user.Email);
+            }
+        }
+
+        public async Task<bool> ResetPasswordAsync(
+            int userId, string token, string newPassword, CancellationToken ct = default)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user is null || !user.IsActive || user.IsDeleted)
+            {
+                _logger.LogWarning("ResetPassword: utente {UserId} non trovato o inattivo.", userId);
+                return false;
+            }
+
+            var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+            if (!result.Succeeded)
+            {
+                _logger.LogWarning("ResetPassword fallito per {UserId}: {Errors}",
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return false;
+            }
+
+            _logger.LogInformation("Password resettata per utente {UserId}.", userId);
+            return true;
+        }
+
         private async Task SendConfirmationEmailAsync(ApplicationUser user, CancellationToken ct)
         {
             try

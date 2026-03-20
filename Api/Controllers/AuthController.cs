@@ -3,6 +3,7 @@ using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
 namespace Api.Controllers
@@ -73,6 +74,34 @@ namespace Api.Controllers
             return Ok(new { message = "Email confermata con successo. Puoi ora accedere." });
         }
 
+        [HttpPost("forgot-password")]
+        [EnableRateLimiting("auth")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // Risponde sempre 204 per anti-enumeration (non riveliamo se l'email esiste)
+            await _authService.ForgotPasswordAsync(request.Email);
+            return NoContent();
+        }
+
+        [HttpPost("reset-password")]
+        [EnableRateLimiting("auth")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var success = await _authService.ResetPasswordAsync(
+                request.UserId, request.Token, request.NewPassword);
+
+            if (!success)
+                return BadRequest(new { message = "Link non valido o scaduto. Richiedi un nuovo reset." });
+
+            return NoContent();
+        }
+
         [Authorize]
         [HttpPost("logout")]
         public async Task<IActionResult> Logout([FromBody] RefreshRequest request)
@@ -84,4 +113,11 @@ namespace Api.Controllers
             return NoContent();
         }
     }
+
+    public record ForgotPasswordRequest([Required, EmailAddress] string Email);
+
+    public record ResetPasswordRequest(
+        [Required] int UserId,
+        [Required] string Token,
+        [Required, MinLength(8), MaxLength(100)] string NewPassword);
 }

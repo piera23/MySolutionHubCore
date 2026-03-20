@@ -11,16 +11,33 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ── Startup config validation ─────────────────────────────────────────────────
+static void RequireConfig(IConfiguration cfg, string key)
+{
+    var value = cfg[key];
+    if (string.IsNullOrWhiteSpace(value) || value.StartsWith("REPLACE_"))
+        throw new InvalidOperationException(
+            $"Configurazione obbligatoria mancante o non sostituita: '{key}'");
+}
+
+RequireConfig(builder.Configuration, "ConnectionStrings:MasterDb");
+RequireConfig(builder.Configuration, "MultiTenant:EncryptionKey");
+RequireConfig(builder.Configuration, "Jwt:Key");
+RequireConfig(builder.Configuration, "Jwt:Issuer");
+RequireConfig(builder.Configuration, "Jwt:Audience");
+
 // ── Servizi ──────────────────────────────────────
+// CORS: origini lette da config (dev = localhost, prod = URL del frontend)
+var corsOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ?? ["http://localhost:5001", "https://localhost:5001"];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("BlazorWeb", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5001",
-                "https://localhost:5001",
-                "http://localhost:7001",
-                "https://localhost:7001")
+        policy.WithOrigins(corsOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -125,7 +142,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddHealthChecks()
-    .AddCheck<Api.HealthChecks.MasterDbHealthCheck>("master-db", tags: ["ready"]);
+    .AddCheck<Api.HealthChecks.MasterDbHealthCheck>("master-db", tags: ["ready"])
+    .AddCheck<Api.HealthChecks.TenantDbHealthCheck>("tenant-db", tags: ["ready"]);
 
 // ── App ──────────────────────────────────────────
 var app = builder.Build();
@@ -164,6 +182,12 @@ if (!app.Environment.IsDevelopment())
         "tenant-migrations",
         svc => svc.TriggerManualRunAsync(CancellationToken.None),
         "0 */12 * * *");
+
+    // Job ricorrente: cleanup refresh token scaduti ogni 24 ore (ore 3:00 UTC)
+    RecurringJob.AddOrUpdate<Infrastructure.Services.RefreshTokenCleanupService>(
+        "refresh-token-cleanup",
+        svc => svc.TriggerManualRunAsync(CancellationToken.None),
+        "0 3 * * *");
 }
 
 app.UseHttpsRedirection();

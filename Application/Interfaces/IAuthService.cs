@@ -23,5 +23,14 @@ namespace Application.Interfaces
 
         /// <summary>Conferma l'email tramite il token generato da Identity.</summary>
         Task<bool> ConfirmEmailAsync(int userId, string token, CancellationToken ct = default);
+
+        /// <summary>
+        /// Genera un token di reset password e invia l'email.
+        /// Non rivela se l'email esiste (anti-enumeration).
+        /// </summary>
+        Task ForgotPasswordAsync(string email, CancellationToken ct = default);
+
+        /// <summary>Valida il token e imposta la nuova password.</summary>
+        Task<bool> ResetPasswordAsync(int userId, string token, string newPassword, CancellationToken ct = default);
     }
 }

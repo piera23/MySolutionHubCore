@@ -62,6 +62,8 @@ namespace Infrastructure
             services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
             // Migration background service
             services.AddHostedService<TenantMigrationHostedService>();
+            // Refresh token cleanup background service
+            services.AddHostedService<RefreshTokenCleanupService>();
 
             // MultiTenant
             services.AddScoped<TenantContext>();

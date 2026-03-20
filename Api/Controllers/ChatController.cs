@@ -2,6 +2,7 @@
 using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.ComponentModel.DataAnnotations;
 
 namespace Api.Controllers
@@ -10,6 +11,7 @@ namespace Api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [RequireFeature("social:chat")]
+    [EnableRateLimiting("api")]
     public class ChatController : TenantApiControllerBase
     {
         private readonly IChatService _chatService;
