@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -16,7 +17,7 @@ namespace MasterDb.Persistence.Migrations
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     TenantId = table.Column<string>(type: "TEXT", nullable: false),
                     Subdomain = table.Column<string>(type: "TEXT", nullable: false),
                     Name = table.Column<string>(type: "TEXT", nullable: false),
@@ -34,7 +35,7 @@ namespace MasterDb.Persistence.Migrations
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     TenantId = table.Column<string>(type: "TEXT", nullable: false),
                     ConnectionStringEncrypted = table.Column<string>(type: "TEXT", nullable: false),
                     DbVersion = table.Column<string>(type: "TEXT", nullable: false),
@@ -57,7 +58,7 @@ namespace MasterDb.Persistence.Migrations
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     TenantId = table.Column<string>(type: "TEXT", nullable: false),
                     FeatureKey = table.Column<string>(type: "TEXT", nullable: false),
                     IsEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
@@ -79,7 +80,7 @@ namespace MasterDb.Persistence.Migrations
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     TenantId = table.Column<string>(type: "TEXT", nullable: false),
                     MigrationId = table.Column<string>(type: "TEXT", nullable: false),
                     AppliedAt = table.Column<DateTime>(type: "TEXT", nullable: false),

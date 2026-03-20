@@ -98,8 +98,7 @@ builder.Services.AddSignalR();
 builder.Services.AddMasterDb(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// ── Hangfire (solo in produzione con SQL Server) ─────────────
-if (!builder.Environment.IsDevelopment())
+// ── Hangfire (PostgreSQL, tutti gli ambienti) ─────────────────
 {
     var hangfireCs = builder.Configuration.GetConnectionString("MasterDb")
         ?? throw new InvalidOperationException("Connection string 'MasterDb' non trovata per Hangfire.");
@@ -108,7 +107,7 @@ if (!builder.Environment.IsDevelopment())
         .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
         .UseSimpleAssemblyNameTypeSerializer()
         .UseRecommendedSerializerSettings()
-        .UseSqlServerStorage(hangfireCs));
+        .UsePostgreSqlStorage(o => o.UseNpgsqlConnection(hangfireCs)));
 
     builder.Services.AddHangfireServer(opts =>
     {

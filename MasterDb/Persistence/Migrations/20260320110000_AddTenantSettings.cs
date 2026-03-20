@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -15,7 +16,7 @@ namespace MasterDb.Persistence.Migrations
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     TenantId = table.Column<string>(type: "TEXT", nullable: false),
                     Key = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     Value = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: false),
