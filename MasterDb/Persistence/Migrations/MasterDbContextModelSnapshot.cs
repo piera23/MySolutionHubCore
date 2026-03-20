@@ -141,6 +141,37 @@ namespace MasterDb.Persistence.Migrations
                     b.ToTable("TenantMigrationLogs");
                 });
 
+            modelBuilder.Entity("MasterDb.Entities.TenantSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("TenantSettings");
+                });
+
             modelBuilder.Entity("MasterDb.Entities.TenantConnection", b =>
                 {
                     b.HasOne("MasterDb.Entities.Tenant", null)
@@ -171,6 +202,16 @@ namespace MasterDb.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MasterDb.Entities.TenantSetting", b =>
+                {
+                    b.HasOne("MasterDb.Entities.Tenant", null)
+                        .WithMany("Settings")
+                        .HasForeignKey("TenantId")
+                        .HasPrincipalKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MasterDb.Entities.Tenant", b =>
                 {
                     b.Navigation("Connections");
@@ -178,6 +219,8 @@ namespace MasterDb.Persistence.Migrations
                     b.Navigation("Features");
 
                     b.Navigation("MigrationLogs");
+
+                    b.Navigation("Settings");
                 });
 #pragma warning restore 612, 618
         }

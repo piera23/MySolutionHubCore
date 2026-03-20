@@ -1,8 +1,11 @@
 ﻿@using MudBlazor
 @using Web.Services
 @inject AuthStateService AuthState
+@inject ApiHttpClient ApiClient
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
 
-<MudNavMenu>  
+<MudNavMenu>
     <MudNavLink Href="/" Match="NavLinkMatch.All"
                 Icon="@Icons.Material.Filled.Home">
         Home / Feed
@@ -36,7 +39,17 @@
             Tenant
         </MudNavLink>
     </MudNavGroup>
-    @if (!AuthState.IsAuthenticated)
+
+    <MudDivider Class="my-2" />
+
+    @if (AuthState.IsAuthenticated)
+    {
+        <MudNavLink Icon="@Icons.Material.Filled.Logout"
+                    OnClick="HandleLogout">
+            Esci
+        </MudNavLink>
+    }
+    else
     {
         <MudNavLink Href="/register"
                     Icon="@Icons.Material.Filled.PersonAdd"
@@ -45,4 +58,24 @@
         </MudNavLink>
     }
 </MudNavMenu>
+
+@code {
+    private async Task HandleLogout()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(AuthState.RefreshToken))
+            {
+                var http = ApiClient.GetClient();
+                await http.PostAsJsonAsync("api/auth/logout", new { refreshToken = AuthState.RefreshToken });
+            }
+        }
+        catch { }
+        finally
+        {
+            await AuthState.LogoutAsync();
+            Nav.NavigateTo("/login");
+        }
+    }
+}
 

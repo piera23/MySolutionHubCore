@@ -3,6 +3,7 @@
 @using MudBlazor
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
+@inject ApiHttpClient ApiClient
 
 <PageTitle>Registrazione</PageTitle>
 
@@ -252,8 +253,8 @@
         _loading = true;
         try
         {
-            var http = new System.Net.Http.HttpClient();
-            http.BaseAddress = new Uri("http://localhost:5000");
+            var http = ApiClient.GetClient();
+            http.DefaultRequestHeaders.Remove("X-Tenant-Id");
             http.DefaultRequestHeaders.Add("X-Tenant-Id", _tenantSubdomain);
 
             var response = await http.PostAsJsonAsync("api/auth/register", new
