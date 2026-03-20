@@ -1,4 +1,5 @@
-﻿using Application.Interfaces;
+﻿using Api.Filters;
+using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -8,6 +9,7 @@ namespace Api.Controllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
+    [RequireFeature("social:chat")]
     public class ChatController : TenantApiControllerBase
     {
         private readonly IChatService _chatService;

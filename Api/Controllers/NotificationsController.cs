@@ -1,14 +1,15 @@
-﻿using Application.Interfaces;
+using Api.Filters;
+using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Api.Controllers
 {
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
-    public class NotificationsController : ControllerBase
+    [RequireFeature("social:notifications")]
+    public class NotificationsController : TenantApiControllerBase
     {
         private readonly INotificationService _notificationService;
 
@@ -39,12 +40,6 @@ namespace Api.Controllers
             var userId = GetUserId();
             await _notificationService.MarkAllAsReadAsync(userId);
             return NoContent();
-        }
-
-        private int GetUserId()
-        {
-            var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            return int.TryParse(claim, out var id) ? id : 0;
         }
     }
 }

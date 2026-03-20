@@ -1,4 +1,5 @@
-﻿using Domain.Interfaces;
+﻿using Api.Filters;
+using Domain.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -8,6 +9,7 @@ namespace Api.Controllers
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
+    [RequireFeature("social:feed")]
     public class FeedController : TenantApiControllerBase
     {
         private readonly IActivityService _activityService;

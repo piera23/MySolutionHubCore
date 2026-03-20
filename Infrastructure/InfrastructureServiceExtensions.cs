@@ -53,6 +53,8 @@ namespace Infrastructure
             services.AddScoped<INotificationService, NotificationService>();
             services.AddScoped<IActivityService, ActivityService>();
             services.AddScoped<IChatService, ChatService>();
+            // Provisioning
+            services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
 
             // MultiTenant
             services.AddScoped<TenantContext>();

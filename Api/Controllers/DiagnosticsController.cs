@@ -1,4 +1,4 @@
-﻿using Domain.Interfaces;
+using Domain.Interfaces;
 using MasterDb.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -69,42 +69,6 @@ namespace Api.Controllers
                     f.IsEnabled
                 })
             });
-        }
-
-        [HttpPost("fix-tenant")]
-        public async Task<IActionResult> FixTenant(
-    [FromServices] MasterDbContext masterDb,
-    [FromServices] ITenantEncryption encryption)
-        {
-            var connExists = await masterDb.TenantConnections
-                .AnyAsync(c => c.TenantId == "tenant001");
-
-            if (!connExists)
-            {
-                masterDb.TenantConnections.Add(new MasterDb.Entities.TenantConnection
-                {
-                    TenantId = "tenant001",
-                    ConnectionStringEncrypted = encryption.Encrypt("Data Source=tenant001.sqlite"),
-                    DbVersion = "1.0.0",
-                    Region = "eu-west",
-                    UpdatedAt = DateTime.UtcNow
-                });
-            }
-
-            var featuresExist = await masterDb.TenantFeatures
-                .AnyAsync(f => f.TenantId == "tenant001");
-
-            if (!featuresExist)
-            {
-                masterDb.TenantFeatures.AddRange(
-                    new MasterDb.Entities.TenantFeature { TenantId = "tenant001", FeatureKey = "social:feed", IsEnabled = true },
-                    new MasterDb.Entities.TenantFeature { TenantId = "tenant001", FeatureKey = "social:chat", IsEnabled = true },
-                    new MasterDb.Entities.TenantFeature { TenantId = "tenant001", FeatureKey = "social:notifications", IsEnabled = true }
-                );
-            }
-
-            await masterDb.SaveChangesAsync();
-            return Ok("Tenant fixato!");
         }
     }
 }
