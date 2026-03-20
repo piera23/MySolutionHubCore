@@ -95,7 +95,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 builder.Services.AddSignalR();
 
-builder.Services.AddMasterDb(builder.Configuration, builder.Environment);
+builder.Services.AddMasterDb(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // ── Hangfire (solo in produzione con SQL Server) ─────────────
@@ -166,7 +166,9 @@ if (app.Environment.IsDevelopment())
 
     var encryption = scope.ServiceProvider.GetRequiredService<ITenantEncryption>();
     await MasterDbSeeder.SeedAsync(masterDb, encryption, loggerFactory.CreateLogger("MasterDbSeeder"));
-    await TenantDbSeeder.SeedAsync("Data Source=tenant001.sqlite", loggerFactory.CreateLogger("TenantDbSeeder"));
+    await TenantDbSeeder.SeedAsync(
+    "Host=postgres;Port=5432;Database=mysolutionhub_tenant001;Username=postgres;Password=postgres_dev",
+    loggerFactory.CreateLogger("TenantDbSeeder"));
 }
 
 // ── Hangfire dashboard (solo produzione) — protetta da ruolo Admin ──

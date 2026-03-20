@@ -12,8 +12,11 @@ namespace MasterDb.Persistence
     {
         public MasterDbContext CreateDbContext(string[] args)
         {
+            var cs = Environment.GetEnvironmentVariable("MASTERDB_CS")
+                ?? "Host=localhost;Port=5432;Database=mysolutionhub_master;Username=postgres;Password=postgres_dev";
+
             var options = new DbContextOptionsBuilder<MasterDbContext>()
-                .UseSqlite("Data Source=masterdb.sqlite")
+                .UseNpgsql(cs)
                 .Options;
 
             return new MasterDbContext(options);

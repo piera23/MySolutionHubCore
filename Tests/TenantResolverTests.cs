@@ -37,7 +37,7 @@ public class TenantResolverTests
         var enc = CreateEncryption();
 
         db.Tenants.Add(new Tenant { TenantId = "t1", Subdomain = "cliente1", Name = "Demo", IsActive = true, CreatedAt = DateTime.UtcNow });
-        db.TenantConnections.Add(new TenantConnection { TenantId = "t1", ConnectionStringEncrypted = enc.Encrypt("Data Source=t1.sqlite"), DbVersion = "1.0", Region = "eu-west", UpdatedAt = DateTime.UtcNow });
+        db.TenantConnections.Add(new TenantConnection { TenantId = "t1", ConnectionStringEncrypted = enc.Encrypt("Host=postgres;Port=5432;Database=tenant_t1;Username=postgres;Password=postgres_dev"), DbVersion = "1.0", Region = "eu-west", UpdatedAt = DateTime.UtcNow });
         db.TenantFeatures.Add(new TenantFeature { TenantId = "t1", FeatureKey = "social:feed", IsEnabled = true });
         await db.SaveChangesAsync();
 
@@ -48,7 +48,7 @@ public class TenantResolverTests
         ctx.Should().NotBeNull();
         ctx!.TenantId.Should().Be("t1");
         ctx.TenantName.Should().Be("Demo");
-        ctx.ConnectionString.Should().Be("Data Source=t1.sqlite");
+        ctx.ConnectionString.Should().Be("Host=postgres;Port=5432;Database=tenant_t1;Username=postgres;Password=postgres_dev");
         ctx.IsFeatureEnabled("social:feed").Should().BeTrue();
         ctx.IsFeatureEnabled("social:chat").Should().BeFalse();
     }
@@ -88,7 +88,7 @@ public class TenantResolverTests
         var enc = CreateEncryption();
 
         db.Tenants.Add(new Tenant { TenantId = "t3", Subdomain = "cached", Name = "Cached Co", IsActive = true, CreatedAt = DateTime.UtcNow });
-        db.TenantConnections.Add(new TenantConnection { TenantId = "t3", ConnectionStringEncrypted = enc.Encrypt("Data Source=t3.sqlite"), DbVersion = "1.0", Region = "eu-west", UpdatedAt = DateTime.UtcNow });
+        db.TenantConnections.Add(new TenantConnection { TenantId = "t3", ConnectionStringEncrypted = enc.Encrypt("Host=postgres;Port=5432;Database=tenant_t3;Username=postgres;Password=postgres_dev"), DbVersion = "1.0", Region = "eu-west", UpdatedAt = DateTime.UtcNow });
         await db.SaveChangesAsync();
 
         var cache = new MemoryCache(new MemoryCacheOptions());

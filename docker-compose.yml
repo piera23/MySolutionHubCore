@@ -1,0 +1,88 @@
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: mysolutionhub_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev
+      POSTGRES_DB: mysolutionhub_master
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── pgAdmin (strumento UI per gestire PostgreSQL in sviluppo) ────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mysolutionhub_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@mysolutionhub.local
+      PGADMIN_DEFAULT_PASSWORD: admin_dev
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - dev-tools  # avviato solo con: docker compose --profile dev-tools up
+
+  # ── API (ASP.NET Core) ───────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Api/Dockerfile
+    container_name: mysolutionhub_api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__MasterDb: "Host=postgres;Port=5432;Database=mysolutionhub_master;Username=postgres;Password=postgres_dev"
+      MultiTenant__EncryptionKey: "${MULTITENANT_ENCRYPTION_KEY:-chiave-sviluppo-locale-1234567890}"
+      Jwt__Key: "${JWT_KEY:-chiave-segreta-jwt-sviluppo-minimo-32-caratteri!!}"
+      Jwt__Issuer: MySolutionHub
+      Jwt__Audience: MySolutionHub.Clients
+      App__BaseUrl: "http://localhost:5001"
+      Cors__AllowedOrigins__0: "http://localhost:5001"
+      Cors__AllowedOrigins__1: "http://web:5001"
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Web (Blazor Server) ──────────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: Web/Dockerfile
+    container_name: mysolutionhub_web
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__MasterDb: "Host=postgres;Port=5432;Database=mysolutionhub_master;Username=postgres;Password=postgres_dev"
+      MultiTenant__EncryptionKey: "${MULTITENANT_ENCRYPTION_KEY:-chiave-sviluppo-locale-1234567890}"
+      ApiBaseUrl: "http://api:5000"
+    ports:
+      - "5001:5001"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local

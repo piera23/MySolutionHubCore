@@ -2,7 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace MasterDb
 {
@@ -10,20 +9,14 @@ namespace MasterDb
     {
         public static IServiceCollection AddMasterDb(
             this IServiceCollection services,
-            IConfiguration config,
-            IHostEnvironment env)
+            IConfiguration config)
         {
             var connectionString = config.GetConnectionString("MasterDb")
                 ?? throw new InvalidOperationException(
                     "Connection string 'MasterDb' non trovata.");
 
             services.AddDbContext<MasterDbContext>(options =>
-            {
-                if (env.IsDevelopment())
-                    options.UseSqlite(connectionString);
-                else
-                    options.UseSqlServer(connectionString);
-            });
+                options.UseNpgsql(connectionString));
 
             return services;
         }

@@ -61,7 +61,6 @@ namespace Infrastructure.Services
             using var scope = _scopeFactory.CreateScope();
             var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
             var encryption = scope.ServiceProvider.GetRequiredService<ITenantEncryption>();
-            var env = scope.ServiceProvider.GetRequiredService<IHostEnvironment>();
 
             var tenants = await masterDb.Tenants
                 .Where(t => t.IsActive)
@@ -85,7 +84,7 @@ namespace Infrastructure.Services
                 try
                 {
                     var plainCs = encryption.Decrypt(connection.ConnectionStringEncrypted);
-                    await ApplyPendingMigrationsAsync(masterDb, tenant.TenantId, plainCs, env, ct);
+                    await ApplyPendingMigrationsAsync(masterDb, tenant.TenantId, plainCs, ct);
                 }
                 catch (Exception ex)
                 {
@@ -101,14 +100,10 @@ namespace Infrastructure.Services
             MasterDbContext masterDb,
             string tenantId,
             string connectionString,
-            IHostEnvironment env,
             CancellationToken ct)
         {
             var options = new DbContextOptionsBuilder();
-            if (env.IsDevelopment())
-                options.UseSqlite(connectionString);
-            else
-                options.UseSqlServer(connectionString);
+            options.UseNpgsql(connectionString);
 
             await using var db = new Persistence.BaseAppDbContext(options.Options);
             var pending = (await db.Database.GetPendingMigrationsAsync(ct)).ToList();

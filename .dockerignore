@@ -1,5 +1,6 @@
 **/.git
 **/.vs
+**/.vscode
 **/bin
 **/obj
 **/*.user
@@ -8,3 +9,8 @@
 **/.env
 **/appsettings.Development.json
 **/Dockerfile*
+**/docker-compose*.yml
+**/Tests
+**/*.sqlite
+**/*.db
+**/*.md

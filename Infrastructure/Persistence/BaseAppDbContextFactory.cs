@@ -12,8 +12,12 @@ namespace Infrastructure.Persistence
     {
         public BaseAppDbContext CreateDbContext(string[] args)
         {
+            // Design-time factory: usa la variabile d'ambiente o un default locale
+            var cs = Environment.GetEnvironmentVariable("TENANT_DB_CS")
+                ?? "Host=localhost;Port=5432;Database=mysolutionhub_tenant_design;Username=postgres;Password=postgres_dev";
+
             var options = new DbContextOptionsBuilder<BaseAppDbContext>()
-                .UseSqlite("Data Source=tenant_design.sqlite")
+                .UseNpgsql(cs)
                 .Options;
 
             return new BaseAppDbContext(options);

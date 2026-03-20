@@ -1,10 +1,8 @@
 using Application.Interfaces;
 using MasterDb.Entities;
 using MasterDb.Persistence;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Services
@@ -12,16 +10,13 @@ namespace Infrastructure.Services
     public class TenantProvisioningService : ITenantProvisioningService
     {
         private readonly MasterDbContext _masterDb;
-        private readonly IWebHostEnvironment _env;
         private readonly ILogger<TenantProvisioningService> _logger;
 
         public TenantProvisioningService(
             MasterDbContext masterDb,
-            IWebHostEnvironment env,
             ILogger<TenantProvisioningService> logger)
         {
             _masterDb = masterDb;
-            _env = env;
             _logger = logger;
         }
 
@@ -76,15 +71,10 @@ namespace Infrastructure.Services
 
         // ── Helpers ───────────────────────────────────────────────
 
-        private DbContextOptions BuildOptions(string connectionString)
+        private static DbContextOptions BuildOptions(string connectionString)
         {
             var builder = new DbContextOptionsBuilder();
-
-            if (_env.IsDevelopment())
-                builder.UseSqlite(connectionString);
-            else
-                builder.UseSqlServer(connectionString);
-
+            builder.UseNpgsql(connectionString);
             return builder.Options;
         }
 

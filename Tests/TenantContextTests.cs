@@ -9,11 +9,11 @@ public class TenantContextTests
     public void SetTenant_SetsAllProperties()
     {
         var ctx = new TenantContext();
-        ctx.SetTenant("t1", "Azienda Demo", "Data Source=t1.sqlite");
+        ctx.SetTenant("t1", "Azienda Demo", "Host=postgres;Port=5432;Database=tenant_t1;Username=postgres;Password=postgres_dev");
 
         ctx.TenantId.Should().Be("t1");
         ctx.TenantName.Should().Be("Azienda Demo");
-        ctx.ConnectionString.Should().Be("Data Source=t1.sqlite");
+        ctx.ConnectionString.Should().Be("Host=postgres;Port=5432;Database=tenant_t1;Username=postgres;Password=postgres_dev");
     }
 
     [Fact]

@@ -2,7 +2,6 @@ using Domain.Interfaces;
 using MasterDb.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Hosting;
 
 namespace Api.HealthChecks
 {
@@ -14,16 +13,13 @@ namespace Api.HealthChecks
     {
         private readonly MasterDbContext _masterDb;
         private readonly ITenantEncryption _encryption;
-        private readonly IHostEnvironment _env;
 
         public TenantDbHealthCheck(
             MasterDbContext masterDb,
-            ITenantEncryption encryption,
-            IHostEnvironment env)
+            ITenantEncryption encryption)
         {
             _masterDb = masterDb;
             _encryption = encryption;
-            _env = env;
         }
 
         public async Task<HealthCheckResult> CheckHealthAsync(
@@ -46,10 +42,7 @@ namespace Api.HealthChecks
                 var plainCs = _encryption.Decrypt(connection.ConnectionStringEncrypted);
 
                 var options = new DbContextOptionsBuilder();
-                if (_env.IsDevelopment())
-                    options.UseSqlite(plainCs);
-                else
-                    options.UseSqlServer(plainCs);
+                options.UseNpgsql(plainCs);
 
                 await using var db = new Infrastructure.Persistence.BaseAppDbContext(options.Options);
                 var canConnect = await db.Database.CanConnectAsync(cancellationToken);

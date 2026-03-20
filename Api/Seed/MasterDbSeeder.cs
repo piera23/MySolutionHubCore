@@ -32,7 +32,8 @@ namespace Api.Seed
                 masterDb.TenantConnections.Add(new TenantConnection
                 {
                     TenantId = tenant1.TenantId,
-                    ConnectionStringEncrypted = encryption.Encrypt("Data Source=tenant001.sqlite"),
+                    ConnectionStringEncrypted = encryption.Encrypt(
+                        "Host=postgres;Port=5432;Database=mysolutionhub_tenant001;Username=postgres;Password=postgres_dev"),
                     DbVersion = "1.0.0",
                     Region = "eu-west",
                     UpdatedAt = DateTime.UtcNow

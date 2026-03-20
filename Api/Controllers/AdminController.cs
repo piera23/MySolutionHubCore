@@ -548,10 +548,7 @@ namespace Api.Controllers
             var plainCs = _encryption.Decrypt(connection.ConnectionStringEncrypted);
 
             var options = new DbContextOptionsBuilder<BaseAppDbContext>();
-            if (_env.IsDevelopment())
-                options.UseSqlite(plainCs);
-            else
-                options.UseSqlServer(plainCs);
+            options.UseNpgsql(plainCs);
 
             return new BaseAppDbContext(options.Options);
         }

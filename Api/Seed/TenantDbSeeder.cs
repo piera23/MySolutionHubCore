@@ -11,7 +11,7 @@ namespace Api.Seed
         public static async Task SeedAsync(string connectionString, ILogger logger)
         {
             var options = new DbContextOptionsBuilder<BaseAppDbContext>()
-                .UseSqlite(connectionString)
+                .UseNpgsql(connectionString)
                 .Options;
 
             await using var db = new BaseAppDbContext(options);

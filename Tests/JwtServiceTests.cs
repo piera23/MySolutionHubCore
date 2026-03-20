@@ -25,7 +25,7 @@ public class JwtServiceTests
     private static TenantContext CreateTenantContext(string tenantId = "tenant1")
     {
         var ctx = new TenantContext();
-        ctx.SetTenant(tenantId, "Test Tenant", "Data Source=test.sqlite", []);
+        ctx.SetTenant(tenantId, "Test Tenant", "Host=postgres;Port=5432;Database=mysolutionhub_test;Username=postgres;Password=postgres_dev", []);
         return ctx;
     }
 

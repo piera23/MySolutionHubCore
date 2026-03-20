@@ -71,8 +71,6 @@ namespace Infrastructure.Services
                 .GetRequiredService<MasterDb.Persistence.MasterDbContext>();
             var encryption = scope.ServiceProvider
                 .GetRequiredService<Domain.Interfaces.ITenantEncryption>();
-            var env = scope.ServiceProvider
-                .GetRequiredService<IHostEnvironment>();
 
             var tenants = await masterDb.Tenants
                 .Where(t => t.IsActive)
@@ -92,10 +90,7 @@ namespace Infrastructure.Services
                 {
                     var plainCs = encryption.Decrypt(connection.ConnectionStringEncrypted);
                     var options = new DbContextOptionsBuilder<BaseAppDbContext>();
-                    if (env.IsDevelopment())
-                        options.UseSqlite(plainCs);
-                    else
-                        options.UseSqlServer(plainCs);
+                    options.UseNpgsql(plainCs);
 
                     await using var db = new BaseAppDbContext(options.Options);
 

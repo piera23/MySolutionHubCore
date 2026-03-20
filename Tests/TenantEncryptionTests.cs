@@ -22,7 +22,7 @@ public class TenantEncryptionTests
     public void Encrypt_ThenDecrypt_ReturnOriginalString()
     {
         var enc = CreateEncryption();
-        var plain = "Data Source=tenant001.sqlite";
+        var plain = "Host=postgres;Port=5432;Database=mysolutionhub_tenant001;Username=postgres;Password=postgres_dev";
 
         var cipher = enc.Encrypt(plain);
         var result = enc.Decrypt(cipher);
@@ -34,7 +34,7 @@ public class TenantEncryptionTests
     public void Encrypt_ProducesDifferentCipherEachTime_DueToRandomIV()
     {
         var enc = CreateEncryption();
-        var plain = "Data Source=tenant001.sqlite";
+        var plain = "Host=postgres;Port=5432;Database=mysolutionhub_tenant001;Username=postgres;Password=postgres_dev";
 
         var cipher1 = enc.Encrypt(plain);
         var cipher2 = enc.Encrypt(plain);
