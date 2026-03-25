@@ -346,7 +346,7 @@ namespace Infrastructure.Identity
                 .Where(t => t.UserId == userId && !t.IsRevoked)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(t => t.IsRevoked, true)
-                    .SetProperty(t => t.RevokedAt, DateTime.UtcNow), ct);
+                    .SetProperty(t => t.UpdatedAt, (DateTime?)DateTime.UtcNow), ct);
 
             _logger.LogInformation(
                 "GDPR erasure completata per userId {UserId} — dati anonimizzati.", userId);

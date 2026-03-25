@@ -75,11 +75,13 @@ namespace Web.Services
                 if (_authState.TokenExpiresAt > DateTime.UtcNow.AddMinutes(5))
                     return true;
 
-                // POST senza body — il cookie refresh_token viene inviato
+                // POST con body vuoto — il cookie refresh_token viene inviato
                 // automaticamente dal CookieContainer del HttpClientHandler.
-                var refreshResponse = await base.SendAsync(
-                    new HttpRequestMessage(HttpMethod.Post, "api/v1/auth/refresh"),
-                    ct);
+                var refreshMsg = new HttpRequestMessage(HttpMethod.Post, "api/v1/auth/refresh")
+                {
+                    Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json")
+                };
+                var refreshResponse = await base.SendAsync(refreshMsg, ct);
 
                 if (!refreshResponse.IsSuccessStatusCode)
                     return false;
