@@ -1,4 +1,7 @@
+using Api.Observability;
 using Api.Seed;
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 using Domain.Interfaces;
 using Hangfire;
 using Infrastructure;
@@ -7,6 +10,7 @@ using MasterDb.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,8 +30,10 @@ RequireConfig(builder.Configuration, "Jwt:Key");
 RequireConfig(builder.Configuration, "Jwt:Issuer");
 RequireConfig(builder.Configuration, "Jwt:Audience");
 
-// ── Servizi ──────────────────────────────────────
-// CORS: origini lette da config (dev = localhost, prod = URL del frontend)
+// ── Observability (OpenTelemetry) ─────────────────────────────────────────────
+builder.AddObservability();
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
 var corsOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
     .Get<string[]>()
@@ -43,62 +49,86 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
+
+// ── API Versioning ────────────────────────────────────────────────────────────
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new HeaderApiVersionReader("X-Api-Version"),
+        new QueryStringApiVersionReader("api-version"));
+})
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// ── Swagger con supporto multi-versione ───────────────────────────────────────
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "MySolutionHub API", Version = "v1" });
 
-    c.AddSecurityDefinition("TenantId", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    c.AddSecurityDefinition("TenantId", new OpenApiSecurityScheme
     {
         Description = "Inserisci il TenantId (es. cliente1)",
-        Name = "X-Tenant-Id",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        Scheme = "ApiKey"
+        Name        = "X-Tenant-Id",
+        In          = ParameterLocation.Header,
+        Type        = SecuritySchemeType.ApiKey,
+        Scheme      = "ApiKey"
     });
 
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Description = "JWT Authorization. Inserisci: Bearer {token}",
-        Name = "Authorization",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Name        = "Authorization",
+        In          = ParameterLocation.Header,
+        Type        = SecuritySchemeType.ApiKey,
+        Scheme      = "Bearer"
     });
 
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            new OpenApiSecurityScheme
             {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
             },
             Array.Empty<string>()
         },
         {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            new OpenApiSecurityScheme
             {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "TenantId"
-                }
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "TenantId" }
             },
             Array.Empty<string>()
         }
     });
 });
-builder.Services.AddSignalR();
 
+// ── SignalR + Redis backplane ─────────────────────────────────────────────────
+var signalRBuilder = builder.Services.AddSignalR();
+var redisCs = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrEmpty(redisCs))
+{
+    signalRBuilder.AddStackExchangeRedis(redisCs, options =>
+    {
+        options.Configuration.ChannelPrefix =
+            StackExchange.Redis.RedisChannel.Literal("mysolutionhub");
+    });
+}
+
+// ── Master DB + Infrastructure ────────────────────────────────────────────────
 builder.Services.AddMasterDb(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// ── Hangfire (PostgreSQL, tutti gli ambienti) ─────────────────
+// ── Hangfire ──────────────────────────────────────────────────────────────────
 {
     var hangfireCs = builder.Configuration.GetConnectionString("MasterDb")
         ?? throw new InvalidOperationException("Connection string 'MasterDb' non trovata per Hangfire.");
@@ -112,39 +142,38 @@ builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddHangfireServer(opts =>
     {
         opts.WorkerCount = 2;
-        opts.Queues = new[] { "migrations", "default" };
+        opts.Queues = ["migrations", "default"];
     });
 }
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 builder.Services.AddRateLimiter(options =>
 {
-    // Auth endpoints: max 10 tentativi/minuto per IP
     options.AddFixedWindowLimiter("auth", opt =>
     {
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.PermitLimit = 10;
+        opt.Window               = TimeSpan.FromMinutes(1);
+        opt.PermitLimit          = 10;
         opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0;
+        opt.QueueLimit           = 0;
     });
 
-    // API generica: max 200 richieste/minuto per IP
     options.AddFixedWindowLimiter("api", opt =>
     {
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.PermitLimit = 200;
+        opt.Window               = TimeSpan.FromMinutes(1);
+        opt.PermitLimit          = 200;
         opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 5;
+        opt.QueueLimit           = 5;
     });
 
     options.RejectionStatusCode = 429;
 });
 
+// ── Health Checks ─────────────────────────────────────────────────────────────
 builder.Services.AddHealthChecks()
     .AddCheck<Api.HealthChecks.MasterDbHealthCheck>("master-db", tags: ["ready"])
     .AddCheck<Api.HealthChecks.TenantDbHealthCheck>("tenant-db", tags: ["ready"]);
 
-// ── App ──────────────────────────────────────────
+// ── App pipeline ──────────────────────────────────────────────────────────────
 var app = builder.Build();
 
 app.UseMiddleware<Api.Middleware.GlobalExceptionMiddleware>();
@@ -152,39 +181,46 @@ app.UseMiddleware<Api.Middleware.GlobalExceptionMiddleware>();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+        foreach (var description in provider.ApiVersionDescriptions)
+        {
+            options.SwaggerEndpoint(
+                $"/swagger/{description.GroupName}/swagger.json",
+                $"MySolutionHub API {description.ApiVersion}");
+        }
+    });
 }
 
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
-    var masterDb = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
-    var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+    var masterDb    = scope.ServiceProvider.GetRequiredService<MasterDbContext>();
+    var logFactory  = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
 
     await masterDb.Database.MigrateAsync();
 
     var encryption = scope.ServiceProvider.GetRequiredService<ITenantEncryption>();
-    await MasterDbSeeder.SeedAsync(masterDb, encryption, loggerFactory.CreateLogger("MasterDbSeeder"));
+    await MasterDbSeeder.SeedAsync(masterDb, encryption, logFactory.CreateLogger("MasterDbSeeder"));
     await TenantDbSeeder.SeedAsync(
-    "Host=postgres;Port=5432;Database=mysolutionhub_tenant001;Username=postgres;Password=postgres_dev",
-    loggerFactory.CreateLogger("TenantDbSeeder"));
+        "Host=postgres;Port=5432;Database=mysolutionhub_tenant001;Username=postgres;Password=postgres_dev",
+        logFactory.CreateLogger("TenantDbSeeder"));
 }
 
-// ── Hangfire dashboard (solo produzione) — protetta da ruolo Admin ──
+// Hangfire dashboard (solo produzione)
 if (!app.Environment.IsDevelopment())
 {
     app.UseHangfireDashboard("/hangfire", new DashboardOptions
     {
-        Authorization = new[] { new Api.Hangfire.HangfireAdminAuthFilter() }
+        Authorization = [new Api.Hangfire.HangfireAdminAuthFilter()]
     });
 
-    // Job ricorrente: controllo migrazioni ogni 12 ore
     RecurringJob.AddOrUpdate<Infrastructure.Services.TenantMigrationHostedService>(
         "tenant-migrations",
         svc => svc.TriggerManualRunAsync(CancellationToken.None),
         "0 */12 * * *");
 
-    // Job ricorrente: cleanup refresh token scaduti ogni 24 ore (ore 3:00 UTC)
     RecurringJob.AddOrUpdate<Infrastructure.Services.RefreshTokenCleanupService>(
         "refresh-token-cleanup",
         svc => svc.TriggerManualRunAsync(CancellationToken.None),

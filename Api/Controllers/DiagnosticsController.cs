@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Domain.Interfaces;
 using MasterDb.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,8 @@ namespace Api.Controllers
 {
     [Authorize(Roles = "Admin")]
     [ApiController]
-    [Route("api/[controller]")]
+    [ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     public class DiagnosticsController : ControllerBase
     {
         private readonly ITenantContext _tenantContext;

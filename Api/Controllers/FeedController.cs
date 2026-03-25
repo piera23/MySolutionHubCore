@@ -9,7 +9,7 @@ namespace Api.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     [RequireFeature("social:feed")]
     [EnableRateLimiting("api")]
     public class FeedController : TenantApiControllerBase

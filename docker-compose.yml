@@ -20,6 +20,34 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Redis (SignalR backplane) ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: mysolutionhub_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Jaeger (distributed tracing) ────────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: mysolutionhub_jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+
   # ── pgAdmin (strumento UI per gestire PostgreSQL in sviluppo) ────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -46,6 +74,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__MasterDb: "Host=postgres;Port=5432;Database=mysolutionhub_master;Username=postgres;Password=postgres_dev"
+      ConnectionStrings__Redis: "redis:6379"
       MultiTenant__EncryptionKey: "${MULTITENANT_ENCRYPTION_KEY:-chiave-sviluppo-locale-1234567890}"
       Jwt__Key: "${JWT_KEY:-chiave-segreta-jwt-sviluppo-minimo-32-caratteri!!}"
       Jwt__Issuer: MySolutionHub
@@ -53,10 +82,15 @@ services:
       App__BaseUrl: "http://localhost:5001"
       Cors__AllowedOrigins__0: "http://localhost:5001"
       Cors__AllowedOrigins__1: "http://web:5001"
+      Observability__ServiceName: "mysolutionhub-api"
+      Observability__ServiceVersion: "1.0.0"
+      Observability__OtlpEndpoint: "http://jaeger:4317"
     ports:
       - "5000:5000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
@@ -85,4 +119,6 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local

@@ -254,7 +254,8 @@ services.AddScoped<IMyService, MyService>();
 ```csharp
 // Api/Controllers/MyController.cs
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Authorize]
 [EnableRateLimiting("api")]
 public class MyController : ControllerBase

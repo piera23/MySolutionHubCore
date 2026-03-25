@@ -9,7 +9,7 @@ namespace Api.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     [RequireFeature("social:chat")]
     [EnableRateLimiting("api")]
     public class ChatController : TenantApiControllerBase

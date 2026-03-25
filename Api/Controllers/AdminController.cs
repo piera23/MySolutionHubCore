@@ -1,4 +1,5 @@
 using Application.Interfaces;
+using Asp.Versioning;
 using Domain.Interfaces;
 using Infrastructure.Persistence;
 using MasterDb.Entities;
@@ -15,7 +16,8 @@ namespace Api.Controllers
 {
     [Authorize(Roles = "Admin")]
     [ApiController]
-    [Route("api/[controller]")]
+    [ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
     public class AdminController : ControllerBase
     {
         private readonly MasterDbContext _masterDb;
