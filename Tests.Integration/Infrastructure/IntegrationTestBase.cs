@@ -51,7 +51,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
     // ── Tenant context ────────────────────────────────────────────────────────
     protected TenantContext TenantCtx { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public virtual async Task InitializeAsync()
     {
         // Start containers in parallel
         await Task.WhenAll(
@@ -123,7 +123,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
         await SeedTenantDbAsync();
     }
 
-    public async Task DisposeAsync()
+    public virtual async Task DisposeAsync()
     {
         await TenantDb.DisposeAsync();
         await MasterDb.DisposeAsync();

@@ -23,11 +23,12 @@ public abstract class MultiTenantTestBase : IntegrationTestBase
     protected BaseAppDbContext TenantBDb { get; private set; } = null!;
     protected TenantContext TenantBCtx { get; private set; } = null!;
 
-    public new async Task InitializeAsync()
+    public override async Task InitializeAsync()
     {
-        // Avvia Tenant B prima di chiamare la base (che avvia Master + Tenant A)
+        // Avvia Tenant B container in parallelo con Master + Tenant A (avviati nella base)
         await _tenantBContainer.StartAsync();
 
+        // Inizializza Master DB + Tenant A DB + DI container (dalla classe base)
         await base.InitializeAsync();
 
         // Setup Tenant B DB
@@ -43,10 +44,12 @@ public abstract class MultiTenantTestBase : IntegrationTestBase
         await SeedTenantBAsync();
     }
 
-    public new async Task DisposeAsync()
+    public override async Task DisposeAsync()
     {
         await TenantBDb.DisposeAsync();
         await _tenantBContainer.StopAsync();
+
+        // Pulisce Master DB + Tenant A DB (dalla classe base)
         await base.DisposeAsync();
     }
 
