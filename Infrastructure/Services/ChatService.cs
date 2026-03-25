@@ -1,4 +1,5 @@
-﻿using Application.Interfaces;
+﻿using Application.Common;
+using Application.Interfaces;
 using Domain.Entities;
 using Domain.Interfaces;
 using Infrastructure.Hubs;
@@ -163,6 +164,61 @@ namespace Infrastructure.Services
                     SentAt: x.Message.SentAt,
                     IsOwn: x.Message.SenderId == userId
                 ));
+        }
+
+        public async Task<CursorPage<ChatMessageDto>> GetMessagePageAsync(
+            int conversationId, int userId,
+            string? cursor = null, int pageSize = 30,
+            CancellationToken ct = default)
+        {
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            await using var db = (BaseAppDbContext)_dbFactory.Create();
+
+            var decoded = CursorEncoder.Decode(cursor);
+
+            var query = db.ChatMessages
+                .Where(m => m.ConversationId == conversationId);
+
+            if (decoded.HasValue)
+            {
+                var (afterId, afterTs) = decoded.Value;
+                query = query.Where(m =>
+                    m.SentAt < afterTs ||
+                    (m.SentAt == afterTs && m.Id < afterId));
+            }
+
+            var rows = await query
+                .OrderByDescending(m => m.SentAt)
+                .ThenByDescending(m => m.Id)
+                .Take(pageSize + 1)
+                .Join(db.Users, m => m.SenderId, u => u.Id, (m, u) => new { Message = m, User = u })
+                .ToListAsync(ct);
+
+            var hasMore = rows.Count > pageSize;
+            var items   = rows.Take(pageSize)
+                              .OrderBy(x => x.Message.SentAt)  // re-sort for client display
+                              .ToList();
+
+            string? nextCursor = null;
+            if (hasMore)
+            {
+                // oldest in the page (first after re-sort) is the keyset anchor
+                var oldest = rows.Take(pageSize).Last();
+                nextCursor = CursorEncoder.Encode(oldest.Message.Id, oldest.Message.SentAt);
+            }
+
+            var dtos = items.Select(x => new ChatMessageDto(
+                Id:             x.Message.Id,
+                ConversationId: x.Message.ConversationId,
+                SenderId:       x.Message.SenderId,
+                SenderUsername: x.User.UserName ?? "",
+                SenderAvatar:   x.User.AvatarUrl,
+                Body:           x.Message.Body,
+                SentAt:         x.Message.SentAt,
+                IsOwn:          x.Message.SenderId == userId
+            ));
+
+            return new CursorPage<ChatMessageDto>(dtos, nextCursor, hasMore);
         }
 
         public async Task<ChatMessageDto> SendMessageAsync(

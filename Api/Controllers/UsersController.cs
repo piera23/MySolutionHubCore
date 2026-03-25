@@ -1,4 +1,5 @@
 ﻿using Application.Common;
+using Application.Interfaces;
 using Asp.Versioning;
 using Domain.Interfaces;
 using Infrastructure.Identity;
@@ -20,15 +21,18 @@ namespace Api.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IJwtService _jwtService;
         private readonly IAuditService _audit;
+        private readonly IAuthService _authService;
 
         public UsersController(
             UserManager<ApplicationUser> userManager,
             IJwtService jwtService,
-            IAuditService audit)
+            IAuditService audit,
+            IAuthService authService)
         {
             _userManager = userManager;
             _jwtService = jwtService;
             _audit = audit;
+            _authService = authService;
         }
 
         [HttpGet]
@@ -163,6 +167,17 @@ namespace Api.Controllers
                 user.UserType,
                 user.UpdatedAt
             });
+        }
+
+        [HttpDelete("me")]
+        public async Task<IActionResult> DeleteMe(CancellationToken ct)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var success = await _authService.DeleteAccountAsync(userId, ct);
+            if (!success) return NotFound();
+
+            Response.Cookies.Delete("refresh_token", new CookieOptions { Path = "/api/" });
+            return NoContent();
         }
 
         [HttpPut("me/password")]

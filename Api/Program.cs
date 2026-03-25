@@ -149,6 +149,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 builder.Services.AddRateLimiter(options =>
 {
+    // Auth endpoints: max 10 tentativi/minuto per IP (anti-brute-force)
     options.AddFixedWindowLimiter("auth", opt =>
     {
         opt.Window               = TimeSpan.FromMinutes(1);
@@ -157,12 +158,27 @@ builder.Services.AddRateLimiter(options =>
         opt.QueueLimit           = 0;
     });
 
-    options.AddFixedWindowLimiter("api", opt =>
+    // API generale: max 200 richieste/minuto per coppia TenantId:UserId
+    // Isola il consumo tra tenant e tra utenti dello stesso tenant.
+    // Fallback su IP per richieste anonime.
+    options.AddPolicy<string>("api", httpContext =>
     {
-        opt.Window               = TimeSpan.FromMinutes(1);
-        opt.PermitLimit          = 200;
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit           = 5;
+        var tenantId = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault()
+                       ?? "_";
+        var userId   = httpContext.User?.FindFirst(
+                           System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                       ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                       ?? "_";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"{tenantId}:{userId}",
+            factory: _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                PermitLimit          = 200,
+                Window               = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit           = 5
+            });
     });
 
     options.RejectionStatusCode = 429;

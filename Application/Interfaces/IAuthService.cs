@@ -32,5 +32,12 @@ namespace Application.Interfaces
 
         /// <summary>Valida il token e imposta la nuova password.</summary>
         Task<bool> ResetPasswordAsync(int userId, string token, string newPassword, CancellationToken ct = default);
+
+        /// <summary>
+        /// GDPR right-to-erasure: anonimizza tutti i dati personali dell'utente e
+        /// revoca tutti i suoi refresh token. Non elimina fisicamente i record per
+        /// preservare l'integrità referenziale (messaggi, attività, ecc.).
+        /// </summary>
+        Task<bool> DeleteAccountAsync(int userId, CancellationToken ct = default);
     }
 }

@@ -14,6 +14,8 @@ namespace Application.Interfaces
         Task<ProvisioningResult> ProvisionAsync(
             string tenantId,
             string connectionString,
+            string? adminEmail = null,
+            int trialDays = 0,
             CancellationToken ct = default);
     }
 

@@ -198,7 +198,10 @@ namespace Api.Controllers
 
             // Provisioning DB: crea il DB fisico, applica le migrazioni, seed ruoli.
             // Eseguito DOPO il commit così TenantMigrationLog può usare la FK su Tenant.
-            var result = await _provisioning.ProvisionAsync(request.TenantId, request.ConnectionString);
+            var result = await _provisioning.ProvisionAsync(
+                request.TenantId, request.ConnectionString,
+                adminEmail: request.AdminEmail,
+                trialDays: request.TrialDays);
 
             if (!result.Success)
             {
@@ -564,7 +567,9 @@ namespace Api.Controllers
 
         [Required, MaxLength(200)] string Name,
         [Required, MinLength(10)] string ConnectionString,
-        [MaxLength(50)] string? Region);
+        [MaxLength(50)] string? Region,
+        [EmailAddress, MaxLength(254)] string? AdminEmail,
+        [Range(0, 365)] int TrialDays = 0);
 
     public record UpdateTenantRequest(
         [Required, MaxLength(200)] string Name,

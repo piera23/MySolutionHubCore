@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Application.Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,15 @@ namespace Domain.Interfaces
 
         Task<IEnumerable<ActivityEventDto>> GetFeedAsync(int userId,
             int page = 1, int pageSize = 20, CancellationToken ct = default);
+
+        /// <summary>
+        /// Feed con keyset/cursor pagination.
+        /// Passare <paramref name="cursor"/> null per la prima pagina;
+        /// passare il <c>NextCursor</c> del risultato precedente per le pagine successive.
+        /// </summary>
+        Task<CursorPage<ActivityEventDto>> GetFeedPageAsync(
+            int userId, string? cursor = null, int pageSize = 20,
+            CancellationToken ct = default);
 
         Task FollowAsync(int followerId, int followedId, CancellationToken ct = default);
         Task UnfollowAsync(int followerId, int followedId, CancellationToken ct = default);

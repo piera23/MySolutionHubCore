@@ -1,5 +1,7 @@
 ﻿using Domain.Interfaces;
+using MasterDb.Persistence;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.MultiTenant
@@ -16,7 +18,11 @@ namespace Infrastructure.MultiTenant
             _logger = logger;
         }
 
-        public async Task InvokeAsync(HttpContext context, ITenantResolver resolver, TenantContext tenantContext)
+        public async Task InvokeAsync(
+            HttpContext context,
+            ITenantResolver resolver,
+            TenantContext tenantContext,
+            MasterDbContext masterDb)
         {
             string? identifier = null;
 
@@ -47,6 +53,29 @@ namespace Infrastructure.MultiTenant
                     var tenant = await resolver.ResolveAsync(identifier);
                     if (tenant is not null)
                     {
+                        // Verifica scadenza trial
+                        var trialSetting = await masterDb.TenantSettings
+                            .FirstOrDefaultAsync(s =>
+                                s.TenantId == tenant.TenantId && s.Key == "Trial:EndsAt");
+
+                        if (trialSetting is not null &&
+                            DateTime.TryParse(trialSetting.Value, out var trialEndsAt) &&
+                            trialEndsAt < DateTime.UtcNow)
+                        {
+                            _logger.LogWarning(
+                                "[Tenant] Trial scaduto per {TenantId} (scaduto il {TrialEndsAt}).",
+                                tenant.TenantId, trialEndsAt);
+
+                            context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+                            await context.Response.WriteAsJsonAsync(new
+                            {
+                                error = "trial_expired",
+                                message = "Il periodo di prova è scaduto. Effettua l'upgrade per continuare.",
+                                expiredAt = trialEndsAt
+                            });
+                            return;
+                        }
+
                         _logger.LogInformation("[Tenant] Resolved: {TenantId}", tenant.TenantId);
                         tenantContext.SetTenant(tenant.TenantId, tenant.TenantName, tenant.ConnectionString);
                     }

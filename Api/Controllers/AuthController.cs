@@ -14,11 +14,16 @@ namespace Api.Controllers
     [Route("api/v{version:apiVersion}/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly IAuthService _authService;
+        private const string RefreshTokenCookie = "refresh_token";
+        private static readonly TimeSpan RefreshTokenTtl = TimeSpan.FromDays(7);
 
-        public AuthController(IAuthService authService)
+        private readonly IAuthService _authService;
+        private readonly IWebHostEnvironment _env;
+
+        public AuthController(IAuthService authService, IWebHostEnvironment env)
         {
             _authService = authService;
+            _env = env;
         }
 
         [HttpPost("register")]
@@ -32,7 +37,8 @@ namespace Api.Controllers
             if (result is null)
                 return BadRequest(new { message = "Registrazione fallita. Email già in uso o dati non validi." });
 
-            return Ok(result);
+            SetRefreshCookie(result.RefreshToken);
+            return Ok(ToTokenResponse(result));
         }
 
         [HttpPost("login")]
@@ -46,21 +52,34 @@ namespace Api.Controllers
             if (result is null)
                 return Unauthorized(new { message = "Credenziali non valide." });
 
-            return Ok(result);
+            SetRefreshCookie(result.RefreshToken);
+            return Ok(ToTokenResponse(result));
         }
 
+        /// <summary>
+        /// Rinnova il JWT usando il refresh token dal cookie HttpOnly.
+        /// Accetta anche il token nel body per compatibilità con client non-browser.
+        /// </summary>
         [HttpPost("refresh")]
         [EnableRateLimiting("auth")]
-        public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
+        public async Task<IActionResult> Refresh([FromBody] RefreshRequest? request = null)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
+            // Priorità: cookie HttpOnly → body (backward compat)
+            var refreshToken = Request.Cookies[RefreshTokenCookie]
+                               ?? request?.RefreshToken;
 
-            var result = await _authService.RefreshAsync(request.RefreshToken);
+            if (string.IsNullOrEmpty(refreshToken))
+                return Unauthorized(new { message = "Refresh token mancante." });
+
+            var result = await _authService.RefreshAsync(refreshToken);
             if (result is null)
+            {
+                ClearRefreshCookie();
                 return Unauthorized(new { message = "Refresh token non valido o scaduto." });
+            }
 
-            return Ok(result);
+            SetRefreshCookie(result.RefreshToken);
+            return Ok(ToTokenResponse(result));
         }
 
         [HttpGet("confirm-email")]
@@ -83,7 +102,6 @@ namespace Api.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            // Risponde sempre 204 per anti-enumeration (non riveliamo se l'email esiste)
             await _authService.ForgotPasswordAsync(request.Email);
             return NoContent();
         }
@@ -106,14 +124,51 @@ namespace Api.Controllers
 
         [Authorize]
         [HttpPost("logout")]
-        public async Task<IActionResult> Logout([FromBody] RefreshRequest request)
+        public async Task<IActionResult> Logout([FromBody] RefreshRequest? request = null)
         {
-            var userId = int.Parse(
-                User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 
-            await _authService.RevokeAsync(userId, request.RefreshToken);
+            var refreshToken = Request.Cookies[RefreshTokenCookie] ?? request?.RefreshToken;
+            if (!string.IsNullOrEmpty(refreshToken))
+                await _authService.RevokeAsync(userId, refreshToken);
+
+            ClearRefreshCookie();
             return NoContent();
         }
+
+        // ── Helpers ───────────────────────────────────────────────────────────
+
+        private void SetRefreshCookie(string token)
+        {
+            Response.Cookies.Append(RefreshTokenCookie, token, new CookieOptions
+            {
+                HttpOnly  = true,
+                Secure    = !_env.IsDevelopment(),
+                SameSite  = SameSiteMode.Strict,
+                Path      = "/api/",
+                MaxAge    = RefreshTokenTtl
+            });
+        }
+
+        private void ClearRefreshCookie()
+        {
+            Response.Cookies.Delete(RefreshTokenCookie, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure   = !_env.IsDevelopment(),
+                SameSite = SameSiteMode.Strict,
+                Path     = "/api/"
+            });
+        }
+
+        private static TokenResponse ToTokenResponse(AuthResponse r) => new(
+            AccessToken: r.Token,
+            Username:    r.Username,
+            Email:       r.Email,
+            UserType:    r.UserType,
+            ExpiresAt:   r.ExpiresAt,
+            ExpiresIn:   (int)(r.ExpiresAt - DateTime.UtcNow).TotalSeconds
+        );
     }
 
     public record ForgotPasswordRequest([Required, EmailAddress] string Email);

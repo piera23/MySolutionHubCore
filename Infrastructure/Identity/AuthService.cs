@@ -313,6 +313,47 @@ namespace Infrastructure.Identity
             }
         }
 
+        public async Task<bool> DeleteAccountAsync(int userId, CancellationToken ct = default)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user is null) return false;
+
+            // Anonimizza tutti i dati personali
+            var anonymizedId = $"deleted_{userId}";
+            user.UserName           = anonymizedId;
+            user.NormalizedUserName = anonymizedId.ToUpperInvariant();
+            user.Email              = $"{anonymizedId}@gdpr.deleted";
+            user.NormalizedEmail    = $"{anonymizedId.ToUpperInvariant()}@GDPR.DELETED";
+            user.FirstName          = null;
+            user.LastName           = null;
+            user.AvatarUrl          = null;
+            user.PhoneNumber        = null;
+            user.IsDeleted          = true;
+            user.IsActive           = false;
+            user.UpdatedAt          = DateTime.UtcNow;
+
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                _logger.LogError(
+                    "GDPR erasure fallita per userId {UserId}: {Errors}",
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return false;
+            }
+
+            // Revoca tutti i refresh token
+            await _db.RefreshTokens
+                .Where(t => t.UserId == userId && !t.IsRevoked)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(t => t.IsRevoked, true)
+                    .SetProperty(t => t.RevokedAt, DateTime.UtcNow), ct);
+
+            _logger.LogInformation(
+                "GDPR erasure completata per userId {UserId} — dati anonimizzati.", userId);
+
+            return true;
+        }
+
         private static string GenerateToken() => Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
     }
 }

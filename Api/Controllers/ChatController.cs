@@ -51,9 +51,17 @@ namespace Api.Controllers
         public async Task<IActionResult> GetMessages(
             int conversationId,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 30)
+            [FromQuery] int pageSize = 30,
+            [FromQuery] string? cursor = null)
         {
             var userId = GetUserId();
+
+            if (!string.IsNullOrEmpty(cursor))
+            {
+                var result = await _chatService.GetMessagePageAsync(conversationId, userId, cursor, pageSize);
+                return Ok(result);
+            }
+
             var messages = await _chatService.GetMessagesAsync(conversationId, userId, page, pageSize);
             return Ok(messages);
         }

@@ -22,9 +22,19 @@ namespace Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetFeed([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetFeed(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? cursor = null)
         {
             var userId = GetUserId();
+
+            if (!string.IsNullOrEmpty(cursor))
+            {
+                var result = await _activityService.GetFeedPageAsync(userId, cursor, pageSize);
+                return Ok(result);
+            }
+
             var feed = await _activityService.GetFeedAsync(userId, page, pageSize);
             return Ok(feed);
         }

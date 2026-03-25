@@ -43,4 +43,17 @@ namespace Application.Features.Auth
     public record RefreshRequest(
         [Required] string RefreshToken
     );
+
+    /// <summary>
+    /// Risposta pubblica per login/refresh: non espone il refresh token nel body.
+    /// Il refresh token viene trasmesso esclusivamente come cookie HttpOnly.
+    /// </summary>
+    public record TokenResponse(
+        string AccessToken,
+        string Username,
+        string Email,
+        string UserType,
+        DateTime ExpiresAt,
+        int ExpiresIn
+    );
 }

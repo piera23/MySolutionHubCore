@@ -2,12 +2,17 @@ using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 
 namespace Web.Services
 {
+    /// <summary>
+    /// Mantiene lo stato di autenticazione del circuito Blazor Server.
+    /// Il refresh token NON viene più memorizzato qui: viene gestito dal
+    /// cookie HttpOnly impostato dall'API e trasmesso automaticamente da
+    /// CookieContainer nel TokenRefreshHandler (lato server).
+    /// </summary>
     public class AuthStateService
     {
         private readonly ProtectedSessionStorage _storage;
 
         public string? Token { get; private set; }
-        public string? RefreshToken { get; private set; }
         public string? Username { get; private set; }
         public string? Email { get; private set; }
         public string? UserType { get; private set; }
@@ -27,21 +32,19 @@ namespace Web.Services
         {
             try
             {
-                var token = await _storage.GetAsync<string>("auth_token");
-                var refreshToken = await _storage.GetAsync<string>("auth_refresh_token");
-                var username = await _storage.GetAsync<string>("auth_username");
-                var email = await _storage.GetAsync<string>("auth_email");
-                var userType = await _storage.GetAsync<string>("auth_usertype");
-                var tenant = await _storage.GetAsync<string>("auth_tenant");
+                var token     = await _storage.GetAsync<string>("auth_token");
+                var username  = await _storage.GetAsync<string>("auth_username");
+                var email     = await _storage.GetAsync<string>("auth_email");
+                var userType  = await _storage.GetAsync<string>("auth_usertype");
+                var tenant    = await _storage.GetAsync<string>("auth_tenant");
                 var expiresAt = await _storage.GetAsync<long>("auth_expires_at");
 
                 if (token.Success && !string.IsNullOrEmpty(token.Value))
                 {
-                    Token = token.Value;
-                    RefreshToken = refreshToken.Value;
-                    Username = username.Value;
-                    Email = email.Value;
-                    UserType = userType.Value;
+                    Token          = token.Value;
+                    Username       = username.Value;
+                    Email          = email.Value;
+                    UserType       = userType.Value;
                     TenantSubdomain = tenant.Value ?? "cliente1";
                     TokenExpiresAt = expiresAt.Success
                         ? new DateTime(expiresAt.Value, DateTimeKind.Utc)
@@ -54,24 +57,21 @@ namespace Web.Services
 
         public async Task SetUserAsync(
             string token,
-            string refreshToken,
             string username,
             string email,
             string userType,
             DateTime expiresAt,
             string tenantSubdomain = "cliente1")
         {
-            Token = token;
-            RefreshToken = refreshToken;
-            Username = username;
-            Email = email;
-            UserType = userType;
+            Token           = token;
+            Username        = username;
+            Email           = email;
+            UserType        = userType;
             TenantSubdomain = tenantSubdomain;
-            TokenExpiresAt = expiresAt;
+            TokenExpiresAt  = expiresAt;
             ExtractUserId();
 
             await _storage.SetAsync("auth_token", token);
-            await _storage.SetAsync("auth_refresh_token", refreshToken);
             await _storage.SetAsync("auth_username", username);
             await _storage.SetAsync("auth_email", email);
             await _storage.SetAsync("auth_usertype", userType);
@@ -81,16 +81,14 @@ namespace Web.Services
             NotifyStateChanged();
         }
 
-        /// <summary>Aggiorna solo token e refresh token (usato dall'auto-refresh).</summary>
-        public async Task UpdateTokensAsync(string token, string refreshToken, DateTime expiresAt)
+        /// <summary>Aggiorna solo l'access token (usato dall'auto-refresh via cookie).</summary>
+        public async Task UpdateAccessTokenAsync(string token, DateTime expiresAt)
         {
-            Token = token;
-            RefreshToken = refreshToken;
+            Token          = token;
             TokenExpiresAt = expiresAt;
             ExtractUserId();
 
             await _storage.SetAsync("auth_token", token);
-            await _storage.SetAsync("auth_refresh_token", refreshToken);
             await _storage.SetAsync("auth_expires_at", expiresAt.Ticks);
 
             NotifyStateChanged();
@@ -98,17 +96,15 @@ namespace Web.Services
 
         public async Task LogoutAsync()
         {
-            Token = null;
-            RefreshToken = null;
-            Username = null;
-            Email = null;
-            UserType = null;
+            Token           = null;
+            Username        = null;
+            Email           = null;
+            UserType        = null;
             TenantSubdomain = null;
-            UserId = 0;
-            TokenExpiresAt = default;
+            UserId          = 0;
+            TokenExpiresAt  = default;
 
             await _storage.DeleteAsync("auth_token");
-            await _storage.DeleteAsync("auth_refresh_token");
             await _storage.DeleteAsync("auth_username");
             await _storage.DeleteAsync("auth_email");
             await _storage.DeleteAsync("auth_usertype");
@@ -120,9 +116,9 @@ namespace Web.Services
 
         private void ExtractUserId()
         {
-            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(Token);
-            var idClaim = jwt.Claims.FirstOrDefault(c => c.Type == "nameid" || c.Type == "sub");
+            var handler  = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwt      = handler.ReadJwtToken(Token);
+            var idClaim  = jwt.Claims.FirstOrDefault(c => c.Type == "nameid" || c.Type == "sub");
             UserId = int.TryParse(idClaim?.Value, out var id) ? id : 0;
         }
 

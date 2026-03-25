@@ -1,4 +1,5 @@
-﻿using Domain.Entities;
+﻿using Application.Common;
+using Domain.Entities;
 using Domain.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -114,6 +115,81 @@ namespace Infrastructure.Services
                 HasReacted: userReactions.Contains(x.Event.Id),
                 CreatedAt: x.Event.CreatedAt
             ));
+        }
+
+        public async Task<CursorPage<ActivityEventDto>> GetFeedPageAsync(
+            int userId,
+            string? cursor = null,
+            int pageSize = 20,
+            CancellationToken ct = default)
+        {
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            await using var db = (BaseAppDbContext)_dbFactory.Create();
+
+            var followedIds = await db.UserFollows
+                .Where(f => f.FollowerId == userId && f.IsActive)
+                .Select(f => f.FollowedId)
+                .ToListAsync(ct);
+            followedIds.Add(userId);
+
+            var userReactions = await db.ActivityReactions
+                .Where(r => r.UserId == userId)
+                .Select(r => r.EventId)
+                .ToListAsync(ct);
+
+            var decoded = CursorEncoder.Decode(cursor);
+
+            // Keyset condition: (CreatedAt, Id) < (cursorTs, cursorId)
+            var query = db.ActivityEvents
+                .Where(e => followedIds.Contains(e.UserId) && e.IsPublic);
+
+            if (decoded.HasValue)
+            {
+                var (afterId, afterTs) = decoded.Value;
+                query = query.Where(e =>
+                    e.CreatedAt < afterTs ||
+                    (e.CreatedAt == afterTs && e.Id < afterId));
+            }
+
+            var rows = await query
+                .OrderByDescending(e => e.CreatedAt)
+                .ThenByDescending(e => e.Id)
+                .Take(pageSize + 1)
+                .Join(db.Users, e => e.UserId, u => u.Id, (e, u) => new { Event = e, User = u })
+                .ToListAsync(ct);
+
+            var hasMore = rows.Count > pageSize;
+            var items   = rows.Take(pageSize).ToList();
+
+            var eventIds = items.Select(x => x.Event.Id).ToList();
+            var reactionCounts = await db.ActivityReactions
+                .Where(r => eventIds.Contains(r.EventId))
+                .GroupBy(r => r.EventId)
+                .Select(g => new { EventId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.EventId, x => x.Count, ct);
+
+            var dtos = items.Select(x => new ActivityEventDto(
+                Id:            x.Event.Id,
+                UserId:        x.Event.UserId,
+                Username:      x.User.UserName ?? "",
+                AvatarUrl:     x.User.AvatarUrl,
+                EventType:     x.Event.EventType,
+                EntityId:      x.Event.EntityId,
+                EntityType:    x.Event.EntityType,
+                Payload:       x.Event.Payload,
+                ReactionsCount: reactionCounts.GetValueOrDefault(x.Event.Id, 0),
+                HasReacted:    userReactions.Contains(x.Event.Id),
+                CreatedAt:     x.Event.CreatedAt
+            ));
+
+            string? nextCursor = null;
+            if (hasMore)
+            {
+                var last  = items[^1];
+                nextCursor = CursorEncoder.Encode(last.Event.Id, last.Event.CreatedAt);
+            }
+
+            return new CursorPage<ActivityEventDto>(dtos, nextCursor, hasMore);
         }
 
         public async Task FollowAsync(
