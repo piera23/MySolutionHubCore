@@ -69,9 +69,9 @@ public class ChatServiceIntegrationTests : IntegrationTestBase
         var svc = CreateService();
 
         var result = await svc.CreateGroupAsync(
+            creatorId: 1,
             title: "Team Alpha",
-            creatorUserId: 1,
-            participantIds: [2, 3]);
+            memberIds: [2, 3]);
 
         result.Should().NotBeNull();
         result.IsGroup.Should().BeTrue();
@@ -110,9 +110,9 @@ public class ChatServiceIntegrationTests : IntegrationTestBase
             .ToList();
 
         messages.Should().HaveCount(3);
-        // Newest first
-        messages[0].Body.Should().Be("Third");
-        messages[2].Body.Should().Be("First");
+        // Oldest first (GetMessagesAsync re-sorts ascending for chat display)
+        messages[0].Body.Should().Be("First");
+        messages[2].Body.Should().Be("Third");
     }
 
     [Fact]

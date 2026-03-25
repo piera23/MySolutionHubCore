@@ -239,6 +239,87 @@ namespace Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Ri-cifra la connection string del tenant con la versione chiave corrente
+        /// (configurata via MultiTenant:EncryptionKeyVersion).
+        /// Usare dopo aver aggiunto una nuova versione chiave in MultiTenant:EncryptionKeys
+        /// e aver impostato EncryptionKeyVersion alla nuova versione.
+        /// </summary>
+        [HttpPost("tenants/{tenantId}/rotate-key")]
+        public async Task<IActionResult> RotateEncryptionKey(string tenantId)
+        {
+            var connection = await _masterDb.TenantConnections
+                .FirstOrDefaultAsync(c => c.TenantId == tenantId);
+
+            if (connection is null)
+                return NotFound($"Nessuna connection string trovata per il tenant '{tenantId}'.");
+
+            // Decifra con (qualsiasi) chiave storica → ri-cifra con la versione corrente
+            var plainCs = _encryption.Decrypt(connection.ConnectionStringEncrypted);
+            connection.ConnectionStringEncrypted = _encryption.Encrypt(plainCs);
+            connection.UpdatedAt = DateTime.UtcNow;
+
+            await _masterDb.SaveChangesAsync();
+
+            // Invalida la cache così la prossima richiesta ricarica la connection string
+            var subdomain = await _masterDb.Tenants
+                .Where(t => t.TenantId == tenantId)
+                .Select(t => t.Subdomain)
+                .FirstOrDefaultAsync();
+            if (subdomain is not null)
+                _cache.Remove($"tenant:{subdomain}");
+
+            await _audit.LogAsync("RotateEncryptionKey",
+                tenantId: tenantId,
+                entityType: "TenantConnection",
+                entityId: tenantId,
+                changes: "Connection string ri-cifrata con la versione chiave corrente.");
+
+            _logger.LogInformation(
+                "Rotazione chiave completata per tenant {TenantId}.", tenantId);
+
+            return Ok(new { message = "Chiave ruotata con successo.", tenantId });
+        }
+
+        /// <summary>
+        /// Ri-cifra le connection string di TUTTI i tenant attivi con la versione chiave corrente.
+        /// </summary>
+        [HttpPost("rotate-all-keys")]
+        public async Task<IActionResult> RotateAllEncryptionKeys()
+        {
+            var connections = await _masterDb.TenantConnections.ToListAsync();
+            var rotated = 0;
+            var errors  = new List<string>();
+
+            foreach (var conn in connections)
+            {
+                try
+                {
+                    var plain = _encryption.Decrypt(conn.ConnectionStringEncrypted);
+                    conn.ConnectionStringEncrypted = _encryption.Encrypt(plain);
+                    conn.UpdatedAt = DateTime.UtcNow;
+                    rotated++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{conn.TenantId}: {ex.Message}");
+                    _logger.LogError(ex, "Errore rotazione chiave per tenant {TenantId}.", conn.TenantId);
+                }
+            }
+
+            if (rotated > 0)
+                await _masterDb.SaveChangesAsync();
+
+            _cache.Clear();  // invalida tutta la cache tenant
+
+            await _audit.LogAsync("RotateAllEncryptionKeys",
+                entityType: "TenantConnection",
+                entityId: "*",
+                changes: $"Rotated={rotated}, Errors={errors.Count}");
+
+            return Ok(new { rotated, errors });
+        }
+
         [HttpPost("tenants/{tenantId}/provision")]
         public async Task<IActionResult> ProvisionTenant(string tenantId)
         {

@@ -18,6 +18,9 @@ namespace Infrastructure.Persistence
         // Auth
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+        // Outbox (at-least-once delivery)
+        public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
         // Social Layer
         public DbSet<Notification> Notifications => Set<Notification>();
         public DbSet<ActivityEvent> ActivityEvents => Set<ActivityEvent>();
@@ -116,6 +119,15 @@ namespace Infrastructure.Persistence
             {
                 e.HasKey(r => r.Id);
                 e.HasIndex(r => new { r.MessageId, r.UserId }).IsUnique();
+            });
+
+            // OutboxMessage
+            mb.Entity<OutboxMessage>(e =>
+            {
+                e.HasKey(o => o.Id);
+                e.HasIndex(o => new { o.ProcessedAt, o.RetryCount, o.CreatedAt });
+                e.Property(o => o.EventType).HasMaxLength(100).IsRequired();
+                e.Property(o => o.LastError).HasMaxLength(2000);
             });
 
             // RefreshToken

@@ -1,5 +1,6 @@
 ﻿using Domain.Interfaces;
 using Infrastructure.Identity;
+using Infrastructure.Services;
 using Infrastructure.MultiTenant;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
@@ -60,10 +61,12 @@ namespace Infrastructure
             services.AddScoped<IChatService, ChatService>();
             // Provisioning
             services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
-            // Migration background service
+            // Outbox pattern (at-least-once delivery)
+            services.AddScoped<IOutboxPublisher, OutboxPublisher>();
+            // Background services
             services.AddHostedService<TenantMigrationHostedService>();
-            // Refresh token cleanup background service
             services.AddHostedService<RefreshTokenCleanupService>();
+            services.AddHostedService<OutboxProcessorService>();
 
             // MultiTenant
             services.AddScoped<TenantContext>();

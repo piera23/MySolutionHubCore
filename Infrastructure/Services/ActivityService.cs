@@ -53,6 +53,32 @@ namespace Infrastructure.Services
             };
 
             db.ActivityEvents.Add(activity);
+
+            // Outbox: accoda il fan-out ai follower nella stessa transazione.
+            // Il processor in background leggerà questo messaggio e spedirà le
+            // notifiche SignalR a tutti i follower dell'autore (at-least-once).
+            db.OutboxMessages.Add(new OutboxMessage
+            {
+                EventType = "activity.fanout",
+                Payload   = JsonSerializer.Serialize(new
+                {
+                    activityId = 0,       // verrà aggiornato dopo SaveChanges
+                    authorId   = userId,
+                    eventType  = eventType
+                }),
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await db.SaveChangesAsync(ct);
+
+            // Aggiorna il payload outbox con l'id reale dell'attività appena inserita
+            var outboxMsg = db.OutboxMessages.Local.Last();
+            outboxMsg.Payload = JsonSerializer.Serialize(new
+            {
+                activityId = activity.Id,
+                authorId   = userId,
+                eventType  = eventType
+            });
             await db.SaveChangesAsync(ct);
 
             _logger.LogInformation(
