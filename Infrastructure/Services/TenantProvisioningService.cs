@@ -3,6 +3,7 @@ using Domain.Interfaces;
 using MasterDb.Entities;
 using MasterDb.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

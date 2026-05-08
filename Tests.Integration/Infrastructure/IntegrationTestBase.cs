@@ -1,3 +1,4 @@
+using Domain.Interfaces;
 using Infrastructure.Identity;
 using Infrastructure.MultiTenant;
 using Infrastructure.Persistence;

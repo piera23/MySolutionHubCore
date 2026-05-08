@@ -1,6 +1,7 @@
 using Application.Interfaces;
 using FluentAssertions;
 using Infrastructure.Hubs;
+using Microsoft.EntityFrameworkCore;
 using Infrastructure.MultiTenant;
 using Infrastructure.Persistence;
 using Infrastructure.Services;

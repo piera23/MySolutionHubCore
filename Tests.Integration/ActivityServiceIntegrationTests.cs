@@ -1,6 +1,7 @@
 using Application.Interfaces;
 using FluentAssertions;
 using Infrastructure.MultiTenant;
+using Microsoft.EntityFrameworkCore;
 using Infrastructure.Persistence;
 using Infrastructure.Services;
 using Microsoft.Extensions.Logging;

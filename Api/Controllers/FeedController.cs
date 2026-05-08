@@ -1,5 +1,5 @@
 ﻿using Api.Filters;
-using Domain.Interfaces;
+using Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

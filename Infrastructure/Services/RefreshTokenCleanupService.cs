@@ -64,7 +64,7 @@ namespace Infrastructure.Services
 
             using var scope = _scopeFactory.CreateScope();
             var tenantFactory = scope.ServiceProvider
-                .GetRequiredService<Domain.Interfaces.ITenantDbContextFactory>();
+                .GetRequiredService<Application.Interfaces.ITenantDbContextFactory>();
 
             // Iteriamo su tutti i tenant attivi tramite MasterDb
             var masterDb = scope.ServiceProvider

@@ -4,6 +4,7 @@ using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using Domain.Interfaces;
 using Hangfire;
+using Hangfire.PostgreSql;
 using Infrastructure;
 using MasterDb;
 using MasterDb.Persistence;

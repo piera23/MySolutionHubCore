@@ -1,3 +1,4 @@
+using Application.Interfaces;
 using Domain.Interfaces;
 using FluentAssertions;
 using Infrastructure.Identity;
