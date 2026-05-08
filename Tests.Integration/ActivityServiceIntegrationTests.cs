@@ -112,7 +112,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
         await using var readDb = CreateFreshTenantDb();
         var ev = await readDb.ActivityEvents.FirstAsync(e => e.EntityId == "50");
 
-        await svc.ReactAsync(activityEventId: ev.Id, userId: 1, reactionType: "like");
+        await svc.ReactAsync(eventId: ev.Id, userId: 1, reactionType: "like");
 
         await using var verifyDb = CreateFreshTenantDb();
         var reaction = await verifyDb.ActivityReactions
