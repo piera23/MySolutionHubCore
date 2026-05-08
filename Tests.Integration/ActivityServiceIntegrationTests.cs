@@ -81,7 +81,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
         await svc.FollowAsync(followerId: 1, followedId: 5);
 
         await using var db = CreateFreshTenantDb();
-        var follow = await db.Follows
+        var follow = await db.UserFollows
             .FirstOrDefaultAsync(f => f.FollowerId == 1 && f.FollowedId == 5);
 
         follow.Should().NotBeNull();
@@ -96,7 +96,7 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
         await svc.UnfollowAsync(followerId: 1, followedId: 6);
 
         await using var db = CreateFreshTenantDb();
-        var follow = await db.Follows
+        var follow = await db.UserFollows
             .FirstOrDefaultAsync(f => f.FollowerId == 1 && f.FollowedId == 6);
 
         follow.Should().BeNull();
@@ -115,8 +115,8 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
         await svc.ReactAsync(activityEventId: ev.Id, userId: 1, reactionType: "like");
 
         await using var verifyDb = CreateFreshTenantDb();
-        var reaction = await verifyDb.Reactions
-            .FirstOrDefaultAsync(r => r.ActivityEventId == ev.Id && r.UserId == 1);
+        var reaction = await verifyDb.ActivityReactions
+            .FirstOrDefaultAsync(r => r.EventId == ev.Id && r.UserId == 1);
 
         reaction.Should().NotBeNull();
         reaction!.ReactionType.Should().Be("like");
@@ -136,8 +136,8 @@ public class ActivityServiceIntegrationTests : IntegrationTestBase
         await svc.ReactAsync(ev.Id, userId: 1, reactionType: "like"); // toggle off
 
         await using var verifyDb = CreateFreshTenantDb();
-        var reaction = await verifyDb.Reactions
-            .FirstOrDefaultAsync(r => r.ActivityEventId == ev.Id && r.UserId == 1);
+        var reaction = await verifyDb.ActivityReactions
+            .FirstOrDefaultAsync(r => r.EventId == ev.Id && r.UserId == 1);
 
         reaction.Should().BeNull();
     }

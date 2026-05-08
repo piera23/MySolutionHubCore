@@ -310,7 +310,14 @@ namespace Api.Controllers
             if (rotated > 0)
                 await _masterDb.SaveChangesAsync();
 
-            _cache.Clear();  // invalida tutta la cache tenant
+            // Invalida solo le voci dei tenant ruotati, non tutta la cache
+            var rotatedIds = connections.Select(c => c.TenantId).ToList();
+            var subdomains = await _masterDb.Tenants
+                .Where(t => rotatedIds.Contains(t.TenantId))
+                .Select(t => t.Subdomain)
+                .ToListAsync();
+            foreach (var sub in subdomains)
+                _cache.Remove($"tenant:{sub}");
 
             await _audit.LogAsync("RotateAllEncryptionKeys",
                 entityType: "TenantConnection",

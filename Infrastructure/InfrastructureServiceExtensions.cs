@@ -15,7 +15,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Identity;
-using Infrastructure.Services;
 
 namespace Infrastructure
 {
