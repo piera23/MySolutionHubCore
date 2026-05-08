@@ -39,7 +39,7 @@ public abstract class MultiTenantTestBase : IntegrationTestBase
         await TenantBDb.Database.MigrateAsync();
 
         TenantBCtx = new TenantContext();
-        TenantBCtx.SetTenant("tenant-b", "Tenant B", TenantBConnectionString, features: []);
+        TenantBCtx.SetTenant("tenant-b", "Tenant B", TenantBConnectionString, enabledFeatures: []);
 
         await SeedTenantBAsync();
     }

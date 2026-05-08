@@ -83,7 +83,7 @@ public abstract class IntegrationTestBase : IAsyncLifetime
             "integration-tenant",
             "Integration Test Tenant",
             TenantConnectionString,
-            features: []);
+            enabledFeatures: []);
 
         // ── Tenant DB ─────────────────────────────────────────────────────────
         var tenantOptions = new DbContextOptionsBuilder<BaseAppDbContext>()
