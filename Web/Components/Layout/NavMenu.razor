@@ -64,11 +64,8 @@
     {
         try
         {
-            if (!string.IsNullOrEmpty(AuthState.RefreshToken))
-            {
-                var http = ApiClient.GetClient();
-                await http.PostAsJsonAsync("api/auth/logout", new { refreshToken = AuthState.RefreshToken });
-            }
+            var http = ApiClient.GetClient();
+            await http.PostAsJsonAsync("api/auth/logout", new { });
         }
         catch { }
         finally

@@ -131,7 +131,7 @@
                     var tenantSubdomain = host.Contains('.') ? host.Split('.')[0] : "cliente1";
 
                     await AuthState.SetUserAsync(
-                        result.Token, result.RefreshToken,
+                        result.Token,
                         result.Username, result.Email,
                         result.UserType, result.ExpiresAt, tenantSubdomain);
 
